@@ -69,9 +69,18 @@ export const getReports = async (req, res, next) => {
 
 export const generateCampaign = async (req, res, next) => {
   try {
-    const { projectId, evidenceId } = req.body;
+    const { projectId, evidenceId, reportId } = req.body;
     
-    console.log('[Report Controller] Campaign generation requested', { projectId, evidenceId });
+    console.log('[Report Controller] Campaign generation requested', { projectId, evidenceId, reportId });
+
+    if (!reportId) {
+      return res.status(400).json({ error: 'reportId is required' });
+    }
+
+    const report = await Report.findById(reportId);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
 
     const project = await Project.findById(projectId);
     const evidence = await Evidence.findById(evidenceId);
@@ -85,6 +94,10 @@ export const generateCampaign = async (req, res, next) => {
     }
     
     const content = await generateCampaignContent(project, evidence);
+    
+    // Persist the campaign content to the report
+    report.campaignContent = content;
+    await report.save();
     
     res.json({ content });
   } catch (error) {

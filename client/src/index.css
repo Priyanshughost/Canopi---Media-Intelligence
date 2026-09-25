@@ -1,8 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Questrial');
 @import "tailwindcss";
 
 @theme {
   --font-heading: 'Comfortaa', cursive, system-ui, sans-serif;
   --font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-questrial: 'Questrial', sans-serif;
 
   /* Map Tailwind grayscale to dynamic theme variables */
   --color-black: var(--text-main);
@@ -20,39 +22,50 @@
 
 :root {
   /* LIGHT THEME VARIABLES (Cool, soft slates - extremely gentle on eyes) */
-  --bg-body: #F1F5F9; /* Slate 100 */
-  --bg-gradient-1: #F8FAFC; /* Slate 50 */
-  --bg-gradient-2: #F1F5F9; /* Slate 100 */
-  --bg-gradient-3: #E2E8F0; /* Slate 200 */
+  --bg-body: #F1F5F9;
+  /* Slate 100 */
+  --bg-gradient-1: #F8FAFC;
+  /* Slate 50 */
+  --bg-gradient-2: #F1F5F9;
+  /* Slate 100 */
+  --bg-gradient-3: #E2E8F0;
+  /* Slate 200 */
 
   --glass-bg: rgba(255, 255, 255, 0.5);
   --glass-border: rgba(255, 255, 255, 0.7);
-  
+
   /* Text */
-  --text-main: #334155; /* Slate 700 - softer than black */
-  --text-muted: #64748B; /* Slate 500 */
-  --text-main-inverse: #F8FAFC; 
-  
+  --text-main: #334155;
+  /* Slate 700 - softer than black */
+  --text-muted: #64748B;
+  /* Slate 500 */
+  --text-main-inverse: #F8FAFC;
+
   /* Primary Card (Neumorphic) */
-  --card-primary-bg: #F1F5F9; /* Match body for true neumorphism */
+  --card-primary-bg: #F1F5F9;
+  /* Match body for true neumorphism */
   --card-primary-text: #334155;
   --card-primary-border: rgba(255, 255, 255, 0.5);
-  --card-primary-shadow-dark: rgba(148, 163, 184, 0.4); /* Stronger dark shadow for depth */
-  --card-primary-shadow-light: rgba(255, 255, 255, 0.9); /* Stronger highlight */
-  
+  --card-primary-shadow-dark: rgba(148, 163, 184, 0.4);
+  /* Stronger dark shadow for depth */
+  --card-primary-shadow-light: rgba(255, 255, 255, 0.9);
+  /* Stronger highlight */
+
   /* Secondary Card (Slate instead of stark black) */
-  --card-secondary-bg: #475569; /* Slate 600 */
+  --card-secondary-bg: #475569;
+  /* Slate 600 */
   --card-secondary-text: #F8FAFC;
   --card-secondary-border: rgba(255, 255, 255, 0.1);
   --card-secondary-shadow-dark: rgba(148, 163, 184, 0.2);
   --card-secondary-shadow-light: rgba(255, 255, 255, 0.5);
 
   /* Buttons (Neumorphic) */
-  --btn-bg: #F1F5F9; /* Match body */
+  --btn-bg: #F1F5F9;
+  /* Match body */
   --btn-text: #334155;
   --btn-border: rgba(255, 255, 255, 0.3);
   --btn-hover-bg: #F1F5F9;
-  
+
   /* Sidebar */
   --sidebar-bg: rgba(241, 245, 249, 0.8);
   --sidebar-text: #64748B;
@@ -69,19 +82,21 @@
 
   --glass-bg: rgba(24, 24, 27, 0.4);
   --glass-border: rgba(255, 255, 255, 0.05);
-  
+
   /* Text */
-  --text-main: #F4F4F5; /* Zinc 100 for Dark Mode */
-  --text-muted: #A1A1AA; /* Zinc 400 */
+  --text-main: #F4F4F5;
+  /* Zinc 100 for Dark Mode */
+  --text-muted: #A1A1AA;
+  /* Zinc 400 */
   --text-main-inverse: #09090B;
-  
+
   /* Primary Card (White -> Zinc 800) */
   --card-primary-bg: rgba(39, 39, 42, 0.5);
   --card-primary-text: #F4F4F5;
   --card-primary-border: rgba(255, 255, 255, 0.05);
   --card-primary-shadow-dark: rgba(0, 0, 0, 0.4);
   --card-primary-shadow-light: rgba(255, 255, 255, 0.05);
-  
+
   /* Secondary Card (Black -> Pitch Black) */
   --card-secondary-bg: #000000;
   --card-secondary-text: #F4F4F5;
@@ -94,7 +109,7 @@
   --btn-text: #F4F4F5;
   --btn-border: rgba(255, 255, 255, 0.1);
   --btn-hover-bg: #52525B;
-  
+
   /* Sidebar */
   --sidebar-bg: #18181B;
   --sidebar-text: #A1A1AA;
@@ -168,7 +183,7 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  
+
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -176,9 +191,9 @@
 
 body {
   background-color: var(--bg-body);
-  background-image: 
-    radial-gradient(at 0% 0%, var(--bg-gradient-1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, var(--bg-gradient-2) 0, transparent 50%), 
+  background-image:
+    radial-gradient(at 0% 0%, var(--bg-gradient-1) 0, transparent 50%),
+    radial-gradient(at 50% 0%, var(--bg-gradient-2) 0, transparent 50%),
     radial-gradient(at 100% 0%, var(--bg-gradient-3) 0, transparent 50%);
   color: var(--text-main);
   min-height: 100vh;
@@ -188,6 +203,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, h5, h6, .font-heading {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.font-heading {
   font-family: var(--font-heading);
 }

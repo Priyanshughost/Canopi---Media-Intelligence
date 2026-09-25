@@ -10,7 +10,7 @@ import reportRoutes from './modules/reports/report.routes.js';
 const app = express();
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: true, // Dynamically allow any origin (e.g. testing from a phone or 127.0.0.1)
   credentials: true
 }));
 app.use(express.json());
@@ -19,8 +19,6 @@ app.use(express.urlencoded({ extended: true }));
 // Arranged Console Logging for End-to-End Debugging
 app.use((req, res, next) => {
   const start = Date.now();
-  
-  // Don't log spammy static or health check routes too loudly if not needed, but we'll log all for now
   console.log(`\n╭───────────────────────────────────────────────────`);
   console.log(`│ ➡️  [REQUEST]  ${req.method} ${req.originalUrl}`);
   
@@ -44,6 +42,7 @@ app.use((req, res, next) => {
   
   next();
 });
+
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Canopi API is running' });

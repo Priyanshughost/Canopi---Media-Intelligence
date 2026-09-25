@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { gemini_2_5_flash } from "../models/gemini.js";
 import { qwen27b } from "../models/qwen-27b.js";
 
 // Define the structured output schema we expect from Gemini

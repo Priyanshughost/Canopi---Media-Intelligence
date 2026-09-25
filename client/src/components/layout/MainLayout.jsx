@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
+import { API_URL } from '../../config.js';
 import { Home, Folder, Image, FileText, SearchIcon, ShieldCheck, SlidersHorizontal, Settings, Users, Activity } from 'lucide-react';
 
 const NavItem = ({ to, icon: Icon, label, active, count }) => (
@@ -28,12 +29,43 @@ const NavItem = ({ to, icon: Icon, label, active, count }) => (
 
 export const MainLayout = () => {
   const location = useLocation();
+  const [counts, setCounts] = useState({ projects: 0, evidence: 0 });
+  const [greeting, setGreeting] = useState('');
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('Good Morning');
+    else if (hour < 18) setGreeting('Good Afternoon');
+    else setGreeting('Good Evening');
+  }, []);
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const [projsRes, evRes] = await Promise.all([
+          fetch(`${API_URL}/api/projects`),
+          fetch(`${API_URL}/api/evidence`)
+        ]);
+        if (projsRes.ok && evRes.ok) {
+          const projs = await projsRes.json();
+          const evs = await evRes.json();
+          setCounts({ 
+            projects: projs.length, 
+            evidence: evs.filter(e => !e.verified).length // Count pending evidence
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch sidebar counts:', err);
+      }
+    };
+    fetchCounts();
+  }, [location.pathname]); // Refresh counts on navigation
 
   return (
     <div className="flex h-screen bg-transparent overflow-hidden p-4 md:p-6 lg:p-8">
 
       {/* Outer Glass Container holding the entire app */}
-      <div className="w-full h-full bw-glass-container flex overflow-hidden p-2 space-x-4">
+      <div className="w-full h-full bw-glass-container flex overflow-hidden p-2 space-x-4 relative z-10">
 
         {/* Sidebar */}
         <aside className="w-72 rounded-3xl flex flex-col z-20 h-full overflow-y-auto hide-scrollbar shadow-sm transition-colors duration-300" style={{ backgroundColor: 'var(--sidebar-bg)' }}>
@@ -49,14 +81,14 @@ export const MainLayout = () => {
             <div>
               <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-5 mb-4">Intelligence</h4>
               <NavItem to="/" icon={Home} label="Dashboard" active={location.pathname === '/'} />
-              <NavItem to="/projects" icon={Folder} label="Projects" active={location.pathname.startsWith('/projects')} count={12} />
+              <NavItem to="/projects" icon={Folder} label="Projects" active={location.pathname.startsWith('/projects')} count={counts.projects || undefined} />
               <NavItem to="/media" icon={Image} label="Media" active={location.pathname.startsWith('/media')} />
             </div>
 
             <div>
               <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-5 mb-4">Analysis</h4>
               <NavItem to="/search" icon={SearchIcon} label="Semantic Search" active={location.pathname === '/search'} />
-              <NavItem to="/evidence" icon={ShieldCheck} label="Evidence" active={location.pathname === '/evidence'} count={3} />
+              <NavItem to="/evidence" icon={ShieldCheck} label="Evidence" active={location.pathname === '/evidence'} count={counts.evidence || undefined} />
               <NavItem to="/comparison" icon={SlidersHorizontal} label="Comparisons" active={location.pathname === '/comparison'} />
             </div>
 
@@ -75,19 +107,11 @@ export const MainLayout = () => {
         <main className="flex-1 h-full overflow-y-auto z-10 p-4 md:p-6 hide-scrollbar">
           {/* Top Bar for profile and generic actions */}
           <header className="flex justify-between items-center mb-8">
-            <div className="text-2xl font-bold text-slate-700">
-              {/* Dynamic greeting could go here */}
+            <div className="text-2xl text-slate-700 font-questrial">
+              {greeting}, <span className="text-cyan-600">Innovator</span>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="bw-btn-white flex items-center space-x-2">
-                <span>+ Create</span>
-              </button>
-              <button className="w-10 h-10 rounded-full bw-btn-white flex items-center justify-center hover:opacity-80">
-                <SearchIcon size={18} />
-              </button>
-              <div className="w-10 h-10 rounded-full border-2 overflow-hidden flex items-center justify-center" style={{ borderColor: 'var(--glass-border)', backgroundColor: 'var(--sidebar-bg)' }}>
-                <Users size={20} style={{ color: 'var(--sidebar-text)' }} />
-              </div>
+              {/* Removed useless action buttons */}
             </div>
           </header>
 

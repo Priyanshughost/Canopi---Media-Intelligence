@@ -1,11 +1,13 @@
 import { API_URL } from '../config.js';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle, ShieldAlert, FileText, Image as ImageIcon } from 'lucide-react';
 
 export const Evidence = () => {
   const [evidenceList, setEvidenceList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetch(`${API_URL}/api/evidence`)
@@ -121,7 +123,10 @@ export const Evidence = () => {
                   </div>
                 )}
                 
-                <button className="flex items-center justify-center space-x-2 text-sm text-gray-600 hover:text-gray-800 font-semibold transition-colors py-2">
+                <button 
+                  onClick={() => navigate('/media')}
+                  className="flex items-center justify-center space-x-2 text-sm text-gray-600 hover:text-gray-800 font-semibold transition-colors py-2"
+                >
                   <ImageIcon size={16} />
                   <span>View Source Assets</span>
                 </button>

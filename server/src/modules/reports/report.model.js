@@ -29,6 +29,9 @@ const reportSchema = new mongoose.Schema(
         ref: 'Evidence',
       },
     ],
+    campaignContent: {
+      type: String,
+    },
     generatedBy: {
       provider: String,
       model: String,

@@ -55,21 +55,6 @@ export const Media = () => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-700 mb-2">Media Explorer</h1>
           <p className="text-gray-600">Browse all visual evidence across all projects.</p>
         </div>
-        
-        <div className="flex items-center space-x-3">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Search descriptions..." 
-              className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
-            />
-          </div>
-          <button className="bw-btn-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center space-x-2 border border-gray-200">
-            <Filter size={16} />
-            <span>Filter</span>
-          </button>
-        </div>
       </div>
 
       {loading ? (

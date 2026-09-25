@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { gemini_2_5_flash } from "../models/gemini.js";
+import { qwen27b } from "../models/qwen-27b.js";
 
 const ComparisonSchema = z.object({
   summary: z.string().describe("A concise summary of the visual differences between the before and after images."),
@@ -13,11 +13,11 @@ const ComparisonSchema = z.object({
 });
 
 export const compareImages = async (beforeUrl, afterUrl) => {
-  const modelWithStructuredOutput = gemini_2_5_flash.withStructuredOutput(ComparisonSchema);
+  const modelWithStructuredOutput = qwen27b.withStructuredOutput(ComparisonSchema);
 
   const prompt = "You are an expert environmental impact analyst. Compare these two images (before and after) and extract structured observations about the changes according to the schema. Be objective and do not hallucinate scientific measurements.";
 
-  console.log(`[AI Trigger] Starting Gemini Comparison for Before URL: ${beforeUrl} and After URL: ${afterUrl}`);
+  console.log(`[AI Trigger] Starting Qwen Comparison for Before URL: ${beforeUrl} and After URL: ${afterUrl}`);
 
   try {
     const result = await modelWithStructuredOutput.invoke([

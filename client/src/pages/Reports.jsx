@@ -1,5 +1,6 @@
 import { API_URL } from '../config.js';
 import { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { FileText, Share2, Download, Sparkles } from 'lucide-react';
 
 export const Reports = () => {
@@ -85,6 +86,7 @@ export const Reports = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          reportId: report._id,
           projectId: typeof report.projectId === 'object' ? report.projectId._id : report.projectId,
           evidenceId: report.evidenceUsed[0] // Just use the first one for MVP
         })
@@ -102,6 +104,45 @@ export const Reports = () => {
     } finally {
       setGeneratingCampaignId(null);
     }
+  };
+
+  const handleShare = (report) => {
+    const text = `Check out this Impact Report: ${report.title}\n\n${report.executiveSummary}`;
+    if (navigator.share) {
+      navigator.share({
+        title: report.title,
+        text: text
+      }).catch(console.error);
+    } else {
+      navigator.clipboard.writeText(text);
+      alert('Report summary copied to clipboard!');
+    }
+  };
+
+  const handleDownload = (report) => {
+    let content = `# ${report.title}\n\n`;
+    content += `**Project:** ${report.projectId?.name || 'Unknown'}\n`;
+    content += `**Generated on:** ${new Date(report.createdAt).toLocaleDateString()}\n\n`;
+    content += `## Executive Summary\n${report.executiveSummary}\n\n`;
+    content += `## Key Findings\n`;
+    report.keyFindings?.forEach(finding => {
+      content += `- ${finding}\n`;
+    });
+    content += `\n## AI Limitations\n${report.limitations}\n`;
+    
+    if (campaignData[report._id] || report.campaignContent) {
+       content += `\n\n## Campaign Post\n\n${campaignData[report._id] || report.campaignContent}\n`;
+    }
+
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${report.title.replace(/\\s+/g, '_').toLowerCase()}_report.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -156,10 +197,10 @@ export const Reports = () => {
               </div>
               
               <div className="flex space-x-3">
-                <button className="p-2 rounded-full bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors">
+                <button onClick={() => handleShare(report)} title="Share Summary" className="p-2 rounded-full bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors">
                   <Share2 size={18} />
                 </button>
-                <button className="p-2 rounded-full bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors">
+                <button onClick={() => handleDownload(report)} title="Download Report as Markdown" className="p-2 rounded-full bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors">
                   <Download size={18} />
                 </button>
               </div>
@@ -190,7 +231,7 @@ export const Reports = () => {
             </div>
 
             <div className="mt-8 pt-6 border-t border-black/5">
-              {!campaignData[report._id] ? (
+              {!(campaignData[report._id] || report.campaignContent) ? (
                 <button 
                   onClick={() => handleGenerateCampaign(report)}
                   disabled={generatingCampaignId === report._id}
@@ -204,7 +245,23 @@ export const Reports = () => {
                   <h3 className="text-xs font-bold text-cyan-800 uppercase tracking-wider mb-3 flex items-center space-x-2">
                     <Sparkles size={14} /> <span>Campaign Ready</span>
                   </h3>
-                  <div className="text-gray-800 whitespace-pre-wrap font-medium">{campaignData[report._id]}</div>
+                  <div className="text-gray-800 text-sm leading-relaxed max-w-none">
+                    <ReactMarkdown
+                      components={{
+                        h1: ({node, ...props}) => <h1 className="text-2xl font-bold mt-6 mb-3 text-slate-800" {...props} />,
+                        h2: ({node, ...props}) => <h2 className="text-xl font-bold mt-5 mb-2 text-slate-800" {...props} />,
+                        h3: ({node, ...props}) => <h3 className="text-lg font-bold mt-5 mb-2 text-slate-800" {...props} />,
+                        p: ({node, ...props}) => <p className="mb-4" {...props} />,
+                        ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-1" {...props} />,
+                        ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-1" {...props} />,
+                        li: ({node, ...props}) => <li className="text-gray-700" {...props} />,
+                        strong: ({node, ...props}) => <strong className="font-bold text-gray-900" {...props} />,
+                        hr: ({node, ...props}) => <hr className="my-6 border-cyan-100" {...props} />
+                      }}
+                    >
+                      {campaignData[report._id] || report.campaignContent}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               )}
             </div>
