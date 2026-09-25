@@ -1,7 +1,7 @@
 import { API_URL } from '../config.js';
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Upload, Image as ImageIcon, Video, Activity, Loader2, Trash2 } from 'lucide-react';
+import { MapPin, Calendar, Upload, Image as ImageIcon, Video, Activity, Loader2, Trash2, Clock, LayoutGrid } from 'lucide-react';
 
 export const ProjectDetails = () => {
   const { id } = useParams();
@@ -11,6 +11,7 @@ export const ProjectDetails = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('gallery');
 
   const fetchData = async () => {
     try {
@@ -170,7 +171,52 @@ export const ProjectDetails = () => {
           </h2>
         </div>
 
-        {assets.length === 0 ? (
+        {activeTab === 'timeline' ? (
+          <div className="max-w-3xl mx-auto py-8">
+            <div className="relative border-l-2 border-cyan-100 ml-4 space-y-8 pb-4">
+              {[...assets].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(asset => (
+                <div key={asset._id} className="relative pl-8">
+                  {/* Timeline Node */}
+                  <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-cyan-400 border-4 border-white shadow-sm"></div>
+                  
+                  <div className="bw-card-white p-5 rounded-2xl group">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{new Date(asset.createdAt).toLocaleDateString()} {new Date(asset.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                        <h4 className="text-sm font-bold text-slate-700 mt-1 truncate max-w-[200px]">{asset.originalFilename}</h4>
+                      </div>
+                      <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium capitalize">
+                        {asset.processingStatus.toLowerCase()}
+                      </span>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="w-full sm:w-40 h-28 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100 relative">
+                         {asset.mediaType === 'video' ? (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-800 text-white"><Video size={24}/></div>
+                         ) : (
+                            <img src={asset.cloudinary?.secureUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={asset.originalFilename} />
+                         )}
+                      </div>
+                      <div className="flex-1 flex flex-col justify-center space-y-2">
+                        {asset.aiAnalysis?.location && (
+                          <div className="flex items-center text-xs font-semibold bg-cyan-50 border border-cyan-100 text-cyan-700 w-fit px-2.5 py-1 rounded-md">
+                            <MapPin size={12} className="mr-1.5" />
+                            {asset.aiAnalysis.location.name}
+                          </div>
+                        )}
+                        <p className="text-sm text-gray-600 line-clamp-3">
+                          {asset.aiAnalysis?.description || 'No analysis available yet. Wait for Groq to finish processing this asset.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {assets.length === 0 && <div className="pl-8 text-gray-500">No assets uploaded yet.</div>}
+            </div>
+          </div>
+        ) : assets.length === 0 ? (
           <div className="bw-card-white p-12 text-center text-gray-500 flex flex-col items-center justify-center">
             <Upload size={32} className="mb-4 opacity-50" />
             <p className="mb-2">No media uploaded yet.</p>

@@ -1,12 +1,17 @@
 import { API_URL } from '../config.js';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, Activity, MapPin } from 'lucide-react';
+import { Plus, ArrowRight, Activity, MapPin, CheckCircle } from 'lucide-react';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
+
+
 import { CreateProjectModal } from '../components/CreateProjectModal';
 
 import { useState, useEffect } from 'react';
 
 export const Dashboard = () => {
   const [projects, setProjects] = useState([]);
+  const [graphData, setGraphData] = useState([]);
+  const [activities, setActivities] = useState([]);
   const [stats, setStats] = useState({ activeProjects: 0, totalAssets: 0, verifiedEvidence: 0 });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -15,17 +20,100 @@ export const Dashboard = () => {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const [projRes, statsRes] = await Promise.all([
+        const [projRes, statsRes, assetsRes] = await Promise.all([
           fetch(`${API_URL}/api/projects`),
-          fetch(`${API_URL}/api/projects/stats`)
+          fetch(`${API_URL}/api/projects/stats`),
+          fetch(`${API_URL}/api/assets`)
         ]);
         if (!projRes.ok || !statsRes.ok) throw new Error('Failed to fetch data');
         
         const projData = await projRes.json();
         const statsData = await statsRes.json();
+        let allProjects = projData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         
-        setProjects(projData);
+        setProjects(allProjects.slice(0, 3));
         setStats(statsData);
+
+        if (assetsRes?.ok) {
+          const assets = await assetsRes.json();
+          
+          // Generate Graph Data (Last 7 days)
+          const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const counts = {};
+          
+          for(let i=6; i>=0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            counts[days[d.getDay()]] = 0;
+          }
+
+          assets.forEach(asset => {
+             const d = new Date(asset.createdAt);
+             const now = new Date();
+             const diffTime = Math.abs(now - d);
+             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+             if(diffDays <= 7) {
+                 const dayName = days[d.getDay()];
+                 if(counts[dayName] !== undefined) counts[dayName]++;
+             }
+          });
+          
+          const gData = Object.keys(counts).map(k => ({ name: k, assets: counts[k] }));
+          setGraphData(gData);
+
+          // Generate Activities Feed
+          const allActs = [];
+          allProjects.slice(0, 5).forEach(p => {
+             allActs.push({
+                 text: `New Project "${p.name.substring(0,15)}" created`,
+                 date: new Date(p.createdAt),
+                 icon: <Plus size={14} className="text-cyan-600"/>,
+                 color: 'bg-cyan-100'
+             });
+          });
+          assets.slice(0, 15).forEach(a => {
+             if(a.processingStatus === 'READY') {
+               allActs.push({
+                   text: `Analyzed media for "${a.originalFilename.substring(0,15)}..."`,
+                   date: new Date(a.updatedAt || a.createdAt),
+                   icon: <Activity size={14} className="text-purple-600"/>,
+                   color: 'bg-purple-100'
+               });
+             }
+             if(a.verified) {
+               allActs.push({
+                   text: `Evidence Verified`,
+                   date: new Date(a.updatedAt || a.createdAt),
+                   icon: <CheckCircle size={14} className="text-emerald-600"/>,
+                   color: 'bg-emerald-100'
+               });
+             }
+          });
+
+          allActs.sort((a,b) => b.date - a.date);
+          
+          const timeSince = (date) => {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            let interval = seconds / 31536000;
+            if (interval > 1) return Math.floor(interval) + " years ago";
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + " months ago";
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + " days ago";
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + " hours ago";
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + " mins ago";
+            return "just now";
+          };
+
+          const finalActs = allActs.slice(0, 4).map(act => ({
+              ...act,
+              time: timeSince(act.date)
+          }));
+          
+          setActivities(finalActs);
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -67,6 +155,40 @@ export const Dashboard = () => {
             <div className="text-3xl font-light text-slate-700 font-semibold tracking-tight">{loading ? '-' : stat.value}</div>
           </div>
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Activity Graph */}
+        <div className="lg:col-span-2 bw-card-white rounded-3xl p-6">
+          <h2 className="text-xl font-semibold text-slate-700 mb-6">Media Upload Activity</h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={graphData}>
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Bar dataKey="assets" fill="#0891b2" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        
+        {/* Recent Activity Feed */}
+        <div className="bw-card-white rounded-3xl p-6 flex flex-col">
+          <h2 className="text-xl font-semibold text-slate-700 mb-6">Recent Activity</h2>
+          <div className="space-y-6 flex-1">
+            {activities.length === 0 ? <p className="text-gray-400 text-sm mt-4">No recent activity.</p> : activities.map((activity, i) => (
+              <div key={i} className="flex items-start space-x-4">
+                <div className={`p-2 rounded-full ${activity.color}`}>
+                  {activity.icon}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-700">{activity.text}</p>
+                  <p className="text-xs text-gray-500">{activity.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Projects Grid */}
