@@ -1,5 +1,6 @@
 import { API_URL } from '../config.js';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Loader2 } from 'lucide-react';
 
 export const CreateProjectModal = ({ isOpen, onClose, onSuccess }) => {
@@ -50,8 +51,8 @@ export const CreateProjectModal = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-200">
       <div className="bg-[#18181B] rounded-2xl p-8 max-w-md w-full shadow-2xl relative border border-zinc-800 max-h-[90vh] overflow-y-auto hide-scrollbar">
         <button onClick={onClose} className="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors">
           <X size={20} />
@@ -97,6 +98,7 @@ export const CreateProjectModal = ({ isOpen, onClose, onSuccess }) => {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
