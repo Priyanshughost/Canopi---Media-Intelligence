@@ -48,4 +48,46 @@ test('Cloudinary AI Impact Platform API Tests', async (t) => {
     assert.strictEqual(body.error, 'projectId and evidenceIds are required');
   });
 
+  await t.test('GET /api/webhooks/health - should return webhook handler health status', async () => {
+    const res = await fetch(`${API_URL}/webhooks/health`);
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.status, 'active');
+    assert.strictEqual(body.service, 'cloudinary-webhook-handler');
+  });
+
+  await t.test('POST /api/webhooks/cloudinary - safely accepts and acknowledges Cloudinary webhook payload', async () => {
+    const res = await fetch(`${API_URL}/webhooks/cloudinary`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        public_id: 'canopi/sample_webhook_test',
+        notification_type: 'upload',
+        status: 'success',
+      }),
+    });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.received, true);
+  });
+
+  await t.test('GET /api/projects/:id/timeline - should return chronologically grouped timeline', async () => {
+    if (!projectId) return;
+    const res = await fetch(`${API_URL}/projects/${projectId}/timeline?groupBy=day`);
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.projectId, projectId);
+    assert.ok(Array.isArray(body.timeline));
+  });
+
+  await t.test('GET /api/projects/:id/locations - should return location clusters for map/list use', async () => {
+    if (!projectId) return;
+    const res = await fetch(`${API_URL}/projects/${projectId}/locations`);
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.projectId, projectId);
+    assert.ok(Array.isArray(body.clusters));
+  });
 });
+
+

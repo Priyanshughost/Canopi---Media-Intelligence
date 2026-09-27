@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest"
+    "setup:cloudinary-metadata": "node src/scripts/setupCloudinaryMetadata.js",
+    "test": "node --test tests/*.test.js"
   },
   "keywords": [],
   "author": "",

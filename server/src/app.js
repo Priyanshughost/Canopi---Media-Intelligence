@@ -6,6 +6,7 @@ import searchRoutes from './modules/search/search.routes.js';
 import evidenceRoutes from './modules/evidence/evidence.routes.js';
 import comparisonRoutes from './modules/comparisons/comparison.routes.js';
 import reportRoutes from './modules/reports/report.routes.js';
+import webhookRoutes from './modules/webhooks/webhook.routes.js';
 
 const app = express();
 
@@ -55,6 +56,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/evidence', evidenceRoutes);
 app.use('/api/comparisons', comparisonRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Basic error handler
 app.use((err, req, res, next) => {

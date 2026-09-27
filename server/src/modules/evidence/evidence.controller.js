@@ -1,4 +1,6 @@
 import { Evidence } from './evidence.model.js';
+import { MediaAsset } from '../assets/asset.model.js';
+import { syncAssetMetadataToCloudinary } from '../../services/cloudinaryIntelligence.js';
 
 export const createEvidence = async (req, res, next) => {
   try {
@@ -38,10 +40,26 @@ export const verifyEvidence = async (req, res, next) => {
       },
       { new: true }
     );
-    
+
     if (!evidence) {
       return res.status(404).json({ error: 'Evidence not found' });
     }
+
+    // Update verified status on all linked source assets and sync to Cloudinary
+    if (Array.isArray(evidence.sourceAssets) && evidence.sourceAssets.length > 0) {
+      await MediaAsset.updateMany(
+        { _id: { $in: evidence.sourceAssets } },
+        { $set: { verified: true } }
+      );
+
+      // Trigger metadata sync to Cloudinary for each source asset
+      for (const assetId of evidence.sourceAssets) {
+        syncAssetMetadataToCloudinary(assetId, { verified: true }).catch((syncErr) =>
+          console.warn(`[Evidence Verification] Cloudinary sync warning for asset ${assetId}:`, syncErr.message)
+        );
+      }
+    }
+
     res.json(evidence);
   } catch (error) {
     next(error);

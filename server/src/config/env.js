@@ -11,6 +11,9 @@ export const config = {
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
+    qualityThreshold: parseFloat(process.env.CLOUDINARY_QUALITY_THRESHOLD) || 0.6,
+    phashThreshold: parseInt(process.env.CLOUDINARY_PHASH_THRESHOLD, 10) || 8,
+    notificationUrl: process.env.CLOUDINARY_NOTIFICATION_URL || null,
   },
   pinecone: {
     apiKey: process.env.PINECONE_API_KEY,

@@ -5,7 +5,9 @@ import {
   getProjectById,
   updateProject,
   deleteProject,
-  getProjectStats
+  getProjectStats,
+  getProjectTimeline,
+  getProjectLocations,
 } from './project.controller.js';
 
 const router = Router();
@@ -13,6 +15,8 @@ const router = Router();
 router.get('/stats', getProjectStats);
 router.post('/', createProject);
 router.get('/', getProjects);
+router.get('/:id/timeline', getProjectTimeline);
+router.get('/:id/locations', getProjectLocations);
 router.get('/:id', getProjectById);
 router.put('/:id', updateProject);
 router.delete('/:id', deleteProject);

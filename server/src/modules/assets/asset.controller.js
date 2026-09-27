@@ -1,8 +1,12 @@
 import fs from 'fs/promises';
 import { MediaAsset } from './asset.model.js';
-import { cloudinaryService } from '../../integrations/cloudinary.js';
 import { Project } from '../projects/project.model.js';
 import { processAssetPipeline } from './asset.service.js';
+import {
+  uploadWithIntelligence,
+  findDuplicatesByPhash,
+} from '../../services/cloudinaryIntelligence.js';
+import { cloudinaryService } from '../../integrations/cloudinary.js';
 
 export const uploadAsset = async (req, res, next) => {
   try {
@@ -26,25 +30,77 @@ export const uploadAsset = async (req, res, next) => {
     // Determine media type based on mimetype
     const mediaType = file.mimetype.startsWith('video/') ? 'video' : 'image';
 
-    // Upload to Cloudinary
-    let cloudResult;
-    if (mediaType === 'video') {
-      cloudResult = await cloudinaryService.uploadVideo(file.path);
-    } else {
-      cloudResult = await cloudinaryService.uploadImage(file.path);
+    // 1. Upload to Cloudinary with native intelligence (metadata, phash, colors, quality_analysis, eager derivatives, moderation)
+    const {
+      cloudResult,
+      exifLocation,
+      phash,
+      qualityAnalysis,
+      colors,
+      enhancedVersion,
+      derivatives,
+      moderation,
+      flaggedForReview,
+    } = await uploadWithIntelligence(file.path, {
+      mediaType,
+      folder: 'canopi',
+    });
+
+    // 2. Determine Location: EXIF if available, otherwise manual from body if provided
+    let location = undefined;
+    if (exifLocation) {
+      location = {
+        lat: exifLocation.lat,
+        lng: exifLocation.lng,
+        latitude: exifLocation.lat,
+        longitude: exifLocation.lng,
+        source: 'exif',
+      };
+    } else if (req.body.lat !== undefined && req.body.lng !== undefined) {
+      const lat = parseFloat(req.body.lat);
+      const lng = parseFloat(req.body.lng);
+      location = {
+        lat,
+        lng,
+        latitude: lat,
+        longitude: lng,
+        source: 'manual',
+        name: req.body.locationName,
+      };
     }
 
-    // Create Asset Record
+    // 3. Find near-duplicate phash matches in existing assets
+    let possibleDuplicates = [];
+    if (phash) {
+      possibleDuplicates = await findDuplicatesByPhash(phash, null, {
+        projectId: req.body.matchProjectOnly ? projectId : undefined,
+      });
+      console.log(
+        `[Asset Controller] Duplicates found for pHash ${phash}:`,
+        possibleDuplicates.length
+      );
+    }
+
+    // 4. Create Asset Record in MongoDB with full derivatives traceability chain and moderation flags
     const asset = await MediaAsset.create({
       projectId,
       originalFilename: file.originalname,
       mediaType,
+      location,
+      phash,
+      qualityAnalysis,
+      colors,
+      enhancedVersion,
+      derivatives: derivatives || [],
+      moderation: moderation || [],
+      flaggedForReview: Boolean(flaggedForReview),
+      metadata: cloudResult.image_metadata || cloudResult.exif || {},
       cloudinary: {
         publicId: cloudResult.public_id,
         resourceType: cloudResult.resource_type,
         assetType: cloudResult.type,
         secureUrl: cloudResult.secure_url,
-        version: cloudResult.version,
+        version: String(cloudResult.version),
         format: cloudResult.format,
         width: cloudResult.width,
         height: cloudResult.height,
@@ -54,10 +110,92 @@ export const uploadAsset = async (req, res, next) => {
       processingStatus: 'UPLOADED',
     });
 
-    // Trigger async processing job without awaiting it
+    // 5. Trigger async AI processing pipeline without awaiting it
     processAssetPipeline(asset._id, file.path, file.mimetype).catch(console.error);
 
-    res.status(201).json(asset);
+    // 6. Expose possibleDuplicates in response along with asset fields
+    res.status(201).json({
+      ...asset.toObject(),
+      possibleDuplicates,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAssetDerivatives = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    console.log('[Asset Controller] Fetching derivatives for asset ID', { id });
+
+    const asset = await MediaAsset.findById(id);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    res.json({
+      assetId: id,
+      publicId: asset.cloudinary.publicId,
+      originalUrl: asset.cloudinary.secureUrl,
+      derivatives: asset.derivatives || [],
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createDerivative = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { purpose, transformation, transformationOptions } = req.body;
+
+    console.log('[Asset Controller] Creating on-demand derivative', { id, purpose, transformation });
+
+    const asset = await MediaAsset.findById(id);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    const { createDerivedAsset } = await import('../../services/cloudinaryIntelligence.js');
+    const result = await createDerivedAsset(asset._id, {
+      purpose: purpose || 'campaign_post',
+      transformation: transformation || 'c_fill,g_auto,w_1080,h_1080,q_auto,f_auto',
+      transformationOptions,
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAssetDuplicates = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const threshold = req.query.threshold ? parseInt(req.query.threshold, 10) : undefined;
+    const matchProjectOnly = req.query.matchProjectOnly === 'true';
+
+    console.log('[Asset Controller] Checking duplicates for asset ID', { id, threshold });
+
+    const asset = await MediaAsset.findById(id);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    if (!asset.phash) {
+      return res.json({ assetId: id, phash: null, duplicates: [] });
+    }
+
+    const duplicates = await findDuplicatesByPhash(asset.phash, threshold, {
+      excludeAssetId: asset._id,
+      projectId: matchProjectOnly ? asset.projectId : undefined,
+    });
+
+    res.json({
+      assetId: id,
+      phash: asset.phash,
+      duplicates,
+    });
   } catch (error) {
     next(error);
   }
@@ -111,3 +249,140 @@ export const deleteAsset = async (req, res, next) => {
     next(error);
   }
 };
+
+export const analyzeAssetWithCloudinaryVision = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { questions } = req.body;
+
+    console.log('[Asset Controller] Analyzing asset with Cloudinary Vision VQA', { id, questions });
+
+    const asset = await MediaAsset.findById(id);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    const { analyzeWithCloudinaryVision: runCloudinaryVision } = await import(
+      '../../services/cloudinaryIntelligence.js'
+    );
+    const visionAnalysis = await runCloudinaryVision(asset.cloudinary.publicId, questions);
+
+    asset.cloudinaryVisionAnalysis = visionAnalysis;
+    await asset.save();
+
+    res.json({
+      assetId: id,
+      cloudinaryVisionAnalysis: visionAnalysis,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateAsset = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { tags, location, projectId, verified } = req.body;
+
+    console.log('[Asset Controller] Updating asset and syncing to Cloudinary', {
+      id,
+      tags,
+      location,
+      projectId,
+      verified,
+    });
+
+    const asset = await MediaAsset.findById(id);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    if (projectId) asset.projectId = projectId;
+    if (verified !== undefined) asset.verified = Boolean(verified);
+    if (tags) {
+      if (!asset.aiAnalysis) asset.aiAnalysis = {};
+      asset.aiAnalysis.tags = Array.isArray(tags) ? tags : tags.split(',').map((t) => t.trim());
+    }
+    if (location) {
+      asset.location = {
+        ...asset.location,
+        ...(typeof location === 'object' ? location : { name: location }),
+      };
+    }
+
+    await asset.save();
+
+    // Sync changes to Cloudinary
+    const { syncAssetMetadataToCloudinary } = await import(
+      '../../services/cloudinaryIntelligence.js'
+    );
+    const syncResult = await syncAssetMetadataToCloudinary(asset);
+
+    res.json({
+      asset,
+      syncResult,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const syncAssetMetadata = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    console.log('[Asset Controller] Manual Cloudinary metadata sync requested', { id });
+
+    const asset = await MediaAsset.findById(id);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    const { syncAssetMetadataToCloudinary } = await import(
+      '../../services/cloudinaryIntelligence.js'
+    );
+    const result = await syncAssetMetadataToCloudinary(asset);
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSignedAssetUrl = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const expiresInSeconds = req.body?.expiresInSeconds || req.query?.expiresInSeconds || 3600;
+    const transformation = req.body?.transformation || {};
+    const attachment = Boolean(req.body?.attachment || req.query?.attachment);
+
+    console.log('[Asset Controller] Generating signed URL for asset', { id, expiresInSeconds });
+
+    const asset = await MediaAsset.findById(id);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    const { generateSignedAssetUrl } = await import(
+      '../../services/cloudinaryIntelligence.js'
+    );
+
+    const signedData = generateSignedAssetUrl(asset.cloudinary.publicId, {
+      expiresInSeconds: Number(expiresInSeconds),
+      resourceType: asset.cloudinary.resourceType || 'image',
+      type: asset.cloudinary.assetType || 'upload',
+      transformation,
+      attachment,
+    });
+
+    res.json({
+      assetId: id,
+      verified: asset.verified,
+      originalFilename: asset.originalFilename,
+      ...signedData,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+

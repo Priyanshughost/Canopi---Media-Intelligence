@@ -2,19 +2,21 @@ import { Project } from './project.model.js';
 import { MediaAsset } from '../assets/asset.model.js';
 import { Evidence } from '../evidence/evidence.model.js';
 import { cloudinaryService } from '../../integrations/cloudinary.js';
+import { getProjectTimelineHandler } from './project.timeline.js';
+import { getProjectLocationsHandler } from './project.locations.js';
 
 export const getProjectStats = async (req, res, next) => {
   try {
     const [activeProjects, totalAssets, verifiedEvidence] = await Promise.all([
       Project.countDocuments({ status: 'ACTIVE' }),
       MediaAsset.countDocuments(),
-      Evidence.countDocuments({ verified: true })
+      Evidence.countDocuments({ verified: true }),
     ]);
-    
+
     res.json({
       activeProjects,
       totalAssets,
-      verifiedEvidence
+      verifiedEvidence,
     });
   } catch (error) {
     next(error);
@@ -73,13 +75,14 @@ export const deleteProject = async (req, res, next) => {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    // Find all assets for this project
     const assets = await MediaAsset.find({ projectId: req.params.id });
-    
-    // Delete from Cloudinary and DB
+
     for (const asset of assets) {
       try {
-        await cloudinaryService.deleteAsset(asset.cloudinary.publicId, asset.cloudinary.resourceType);
+        await cloudinaryService.deleteAsset(
+          asset.cloudinary.publicId,
+          asset.cloudinary.resourceType
+        );
       } catch (err) {
         console.error('Error deleting from cloudinary', err);
       }
@@ -91,3 +94,6 @@ export const deleteProject = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getProjectTimeline = getProjectTimelineHandler;
+export const getProjectLocations = getProjectLocationsHandler;
