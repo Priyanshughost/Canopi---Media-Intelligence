@@ -5,6 +5,7 @@ export const ProjectHeader = ({
   project,
   uploading,
   onFileUpload,
+  onOpenUploadModal,
   onProjectDelete,
 }) => {
   if (!project) return null;
