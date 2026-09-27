@@ -2,6 +2,9 @@ import { Report } from './report.model.js';
 import { Project } from '../projects/project.model.js';
 import { Evidence } from '../evidence/evidence.model.js';
 import { generateProjectReport, generateCampaignContent } from '../../ai/groq.js';
+import { generateVisualStory } from '../../services/visualStoryGenerator.js';
+import { generateHighlightReel } from '../../services/cloudinaryIntelligence/videoAnalysis.js';
+import { generatePlatformReel } from '../../services/socialReelGenerator.js';
 import { config } from '../../config/env.js';
 
 /**
@@ -289,3 +292,143 @@ export const generateCampaign = async (req, res, next) => {
     next(error);
   }
 };
+
+export const generateVisualStoryForReport = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { format } = req.body;
+
+    console.log('[Report Controller] Visual Story generation requested', { reportId: id, format });
+
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const visualStory = await generateVisualStory(report.projectId, id, { format });
+    res.json(visualStory);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
+export const getVisualStoryForReport = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    if (!report.visualStory || !report.visualStory.slides || report.visualStory.slides.length === 0) {
+      return res.status(404).json({ error: 'Visual story not yet generated for this report' });
+    }
+
+    res.json(report.visualStory);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const generateReportHighlightReel = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const reel = await generateHighlightReel(report.projectId);
+    res.json(reel);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
+export const getReportHighlightReel = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const reel = await generateHighlightReel(report.projectId);
+    res.json(reel);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
+export const generateSocialReelForReport = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const platform = (req.query.platform || req.body?.platform || 'reels').toLowerCase();
+    
+    if (!['reels', 'twitter'].includes(platform)) {
+      return res.status(400).json({ error: 'Invalid platform. Must be "reels" or "twitter"' });
+    }
+
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const reel = await generatePlatformReel(report.projectId, platform);
+
+    // Save to report document
+    if (!report.socialReels) {
+      report.socialReels = {};
+    }
+    report.socialReels[platform] = reel;
+    await report.save();
+
+    res.json(reel);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
+export const getSocialReelForReport = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const platform = (req.query.platform || 'reels').toLowerCase();
+
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const savedReel = report.socialReels?.[platform];
+    if (savedReel && savedReel.videoUrl) {
+      return res.json(savedReel);
+    }
+
+    // Auto-generate if not yet present
+    const reel = await generatePlatformReel(report.projectId, platform);
+    if (!report.socialReels) report.socialReels = {};
+    report.socialReels[platform] = reel;
+    await report.save();
+
+    res.json(reel);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
+

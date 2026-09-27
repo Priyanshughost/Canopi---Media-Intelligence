@@ -9,11 +9,13 @@ import {
   Loader2,
   Trash2,
 } from 'lucide-react';
+import { TrustScoreBadge } from '../common/TrustScoreBadge';
 
 export const ProjectGalleryTab = ({
   assets,
   onSelectAsset,
   onAssetDelete,
+  onOpenUploadModal,
 }) => {
   const getStatusColor = (status) => {
     switch (status) {
@@ -33,10 +35,23 @@ export const ProjectGalleryTab = ({
 
   if (assets.length === 0) {
     return (
-      <div className="bw-card-white p-12 text-center text-gray-500 flex flex-col items-center justify-center rounded-3xl border border-gray-100">
-        <Upload size={32} className="mb-4 opacity-50" />
-        <p className="mb-2 font-medium">No media uploaded yet.</p>
-        <p className="text-sm opacity-75">Upload evidence above to start AI analysis.</p>
+      <div className="bw-card-white p-12 text-center text-gray-500 flex flex-col items-center justify-center rounded-3xl border border-gray-100 space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center mx-auto">
+          <Upload size={28} />
+        </div>
+        <div>
+          <p className="font-bold text-gray-800 text-base">No media uploaded yet.</p>
+          <p className="text-xs text-gray-500 mt-1">Upload multiple photos or videos to start Cloudinary AI analysis.</p>
+        </div>
+        {onOpenUploadModal && (
+          <button
+            onClick={onOpenUploadModal}
+            className="bw-btn-black px-6 py-2.5 rounded-xl text-xs font-semibold flex items-center space-x-2"
+          >
+            <Upload size={14} className="text-cyan-400" />
+            <span>Upload Media Files</span>
+          </button>
+        )}
       </div>
     );
   }
@@ -45,8 +60,11 @@ export const ProjectGalleryTab = ({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {assets.map((asset) => {
         const thumbUrl =
+          asset.thumbnailUrl ||
           asset.derivatives?.find((d) => d.purpose === 'thumbnail')?.url ||
-          asset.cloudinary?.secureUrl;
+          (asset.mediaType === 'video'
+            ? `https://res.cloudinary.com/djlbyyev9/video/upload/c_thumb,w_600,h_400,so_0,f_jpg/${asset.cloudinary?.publicId}.jpg`
+            : asset.cloudinary?.secureUrl);
         const hasExif = asset.location?.source === 'exif';
         const hasEnhanced = Boolean(asset.enhancedVersion);
 
@@ -56,17 +74,24 @@ export const ProjectGalleryTab = ({
             onClick={() => onSelectAsset(asset)}
             className="bw-card-white overflow-hidden group cursor-pointer hover:shadow-xl transition-all rounded-2xl border border-gray-100"
           >
-            <div className="aspect-video bg-gray-100 relative overflow-hidden">
-              {asset.mediaType === 'video' ? (
-                <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                  <Video size={32} className="text-gray-400" />
+            <div className="aspect-video bg-gray-900 relative overflow-hidden">
+              <img
+                src={thumbUrl}
+                alt={asset.originalFilename}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              />
+
+              {asset.mediaType === 'video' && (
+                <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/40 transition-colors">
+                  <div className="w-10 h-10 rounded-full bg-white/90 text-slate-900 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                    <Video size={18} className="ml-0.5" />
+                  </div>
+                  {asset.duration && (
+                    <span className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 text-white text-[10px] font-mono font-bold rounded">
+                      {Math.floor(asset.duration / 60)}:{(asset.duration % 60).toString().padStart(2, '0')}
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <img
-                  src={thumbUrl}
-                  alt={asset.originalFilename}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
               )}
 
               {/* Top Left Badges */}
@@ -95,6 +120,13 @@ export const ProjectGalleryTab = ({
                     <span>Verified</span>
                   </span>
                 )}
+                <div className="pt-0.5">
+                  <TrustScoreBadge
+                    score={asset.trustScore ?? 70}
+                    breakdown={asset.trustScoreBreakdown || []}
+                    size="sm"
+                  />
+                </div>
               </div>
 
               {/* Status and Action controls */}

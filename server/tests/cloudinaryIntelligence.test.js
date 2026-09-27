@@ -6,7 +6,9 @@ import {
   calculateHammingDistance,
   extractQualityScore,
   assessAndEnhanceAsset,
-} from '../src/services/cloudinaryIntelligence.js';
+  analyzeVideoWithCloudinary,
+  generateHighlightReel,
+} from '../src/services/cloudinaryIntelligence/index.js';
 
 test('Cloudinary Intelligence Service Unit Tests', async (t) => {
   await t.test('calculateHammingDistance - calculates correct bit differences', () => {
@@ -177,7 +179,7 @@ test('Cloudinary Intelligence Service Unit Tests', async (t) => {
 
   await t.test('generateSignedAssetUrl - generates signed time-limited URL for authenticated delivery', async () => {
     const { generateSignedAssetUrl } = await import(
-      '../src/services/cloudinaryIntelligence.js'
+      '../src/services/cloudinaryIntelligence/index.js'
     );
 
     const signedResult = generateSignedAssetUrl('canopi/sample_verified_asset', {
@@ -195,6 +197,17 @@ test('Cloudinary Intelligence Service Unit Tests', async (t) => {
     assert.ok(signedResult.signedUrl.includes('canopi/sample_verified_asset'));
     // Ensure URL includes signature marker or secure cloudinary protocol
     assert.ok(signedResult.signedUrl.startsWith('https://') || signedResult.signedUrl.startsWith('http://'));
+  });
+
+  await t.test('analyzeVideoWithCloudinary - generates timestamped segments via fallback when AI Video not enabled', async () => {
+    const result = await analyzeVideoWithCloudinary('canopi/test_field_video', { duration: 25 });
+    assert.ok(result);
+    assert.ok(Array.isArray(result.transcript));
+    assert.ok(result.transcript.length > 0);
+    assert.ok(result.transcript[0].description);
+    assert.strictEqual(typeof result.transcript[0].startTime, 'number');
+    assert.strictEqual(typeof result.transcript[0].endTime, 'number');
+    assert.ok(result.transcript[0].frameUrl);
   });
 });
 

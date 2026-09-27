@@ -44,17 +44,13 @@ export const ProjectHeader = ({
           >
             <Trash2 size={18} />
           </button>
-          <label className="bw-btn-black px-6 py-3 font-semibold flex items-center space-x-2 cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-md">
-            {uploading ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
-            <span>{uploading ? 'Uploading...' : 'Upload Media'}</span>
-            <input
-              type="file"
-              className="hidden"
-              accept="image/*,video/*"
-              onChange={onFileUpload}
-              disabled={uploading}
-            />
-          </label>
+          <button
+            onClick={onOpenUploadModal || onFileUpload}
+            className="bw-btn-black px-6 py-3 font-semibold flex items-center space-x-2 transition-all hover:scale-105 active:scale-95 shadow-md"
+          >
+            <Upload size={18} className="text-cyan-400" />
+            <span>Upload Media (Photos & Videos)</span>
+          </button>
         </div>
       </div>
     </div>

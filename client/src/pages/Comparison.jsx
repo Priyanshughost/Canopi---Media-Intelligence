@@ -1,7 +1,7 @@
 import { API_URL } from '../config.js';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Wand2 } from 'lucide-react';
+import { ArrowRight, Wand2, Video, Image as ImageIcon, Play } from 'lucide-react';
 import { useStepSuccess } from '../context/StepSuccessContext';
 
 export const Comparison = () => {
@@ -19,12 +19,45 @@ export const Comparison = () => {
   useEffect(() => {
     fetch(`${API_URL}/api/assets`)
       .then(res => res.json())
-      .then(data => setAssets(data.filter(a => a.mediaType === 'image')))
+      .then(data => setAssets(Array.isArray(data) ? data : []))
       .catch(err => console.error("Failed to load assets", err));
   }, []);
 
   const beforeAsset = assets.find(a => a._id === beforeAssetId);
   const afterAsset = assets.find(a => a._id === afterAssetId);
+
+  const renderAssetPreview = (asset, label) => {
+    if (!asset) {
+      return (
+        <div className="text-gray-400 font-medium text-xs">
+          Select {label.toLowerCase()} media (photo or video)
+        </div>
+      );
+    }
+
+    const isVideo = asset.mediaType === 'video';
+    const mediaUrl = asset.thumbnailUrl || asset.cloudinary?.secureUrl;
+
+    return (
+      <div className="relative w-full h-full group">
+        <img
+          src={mediaUrl}
+          className="w-full h-full object-cover rounded-2xl"
+          alt={asset.originalFilename}
+        />
+        {isVideo && (
+          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center rounded-2xl">
+            <div className="w-12 h-12 rounded-full bg-cyan-500/90 text-white flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
+              <Play size={20} className="ml-1" />
+            </div>
+            <span className="mt-2 text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded-full">
+              Video {asset.duration ? `(${Math.round(asset.duration)}s)` : ''}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const handleCompare = async () => {
     if (!beforeAssetId || !afterAssetId) return;
@@ -81,48 +114,64 @@ export const Comparison = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-800 font-semibold mb-2">Before / After Comparison</h1>
-          <p className="text-gray-600">Analyze visual changes over time using Gemini Multimodal intelligence.</p>
+          <p className="text-gray-600">Analyze visual changes over time across photos and videos using Cloudinary AI intelligence.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Before Asset Selection (Mocked) */}
+        {/* Before Asset Selection */}
         <div className="space-y-4">
-          <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wider pl-2">Before Asset</h3>
-          <div className="bw-card-white rounded-3xl h-64 border border-dashed border-gray-300 flex flex-col items-center justify-center text-center p-2 relative overflow-hidden">
-            {beforeAsset ? (
-              <img src={beforeAsset.cloudinary?.secureUrl} className="w-full h-full object-cover rounded-2xl" alt="Before" />
-            ) : (
-              <div className="text-gray-400 font-medium">Select baseline image</div>
+          <div className="flex items-center justify-between pl-2">
+            <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wider">Before Asset</h3>
+            {beforeAsset && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${beforeAsset.mediaType === 'video' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                {beforeAsset.mediaType === 'video' ? 'Video' : 'Photo'}
+              </span>
             )}
           </div>
+          <div className="bw-card-white rounded-3xl h-64 border border-dashed border-gray-300 flex flex-col items-center justify-center text-center p-2 relative overflow-hidden">
+            {renderAssetPreview(beforeAsset, 'Baseline')}
+          </div>
           <select 
-            className="w-full p-3 rounded-xl border border-gray-200"
+            className="w-full p-3 rounded-xl border border-gray-200 text-xs font-medium"
             value={beforeAssetId}
             onChange={(e) => setBeforeAssetId(e.target.value)}
           >
-            <option value="">-- Choose Asset --</option>
-            {assets.map(a => <option key={a._id} value={a._id}>{a.originalFilename}</option>)}
+            <option value="">-- Choose Asset (Photo or Video) --</option>
+            {assets.map(a => (
+              <option key={a._id} value={a._id}>
+                {a.mediaType === 'video' ? '🎬 [Video] ' : '📷 [Photo] '}
+                {a.originalFilename} {a.duration ? `(${Math.round(a.duration)}s)` : ''}
+              </option>
+            ))}
           </select>
         </div>
 
-        {/* After Asset Selection (Mocked) */}
+        {/* After Asset Selection */}
         <div className="space-y-4">
-          <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wider pl-2">After Asset</h3>
-          <div className="bw-card-white rounded-3xl h-64 border border-dashed border-gray-300 flex flex-col items-center justify-center text-center p-2 relative overflow-hidden">
-            {afterAsset ? (
-              <img src={afterAsset.cloudinary?.secureUrl} className="w-full h-full object-cover rounded-2xl" alt="After" />
-            ) : (
-              <div className="text-gray-400 font-medium">Select recent image</div>
+          <div className="flex items-center justify-between pl-2">
+            <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wider">After Asset</h3>
+            {afterAsset && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${afterAsset.mediaType === 'video' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                {afterAsset.mediaType === 'video' ? 'Video' : 'Photo'}
+              </span>
             )}
           </div>
+          <div className="bw-card-white rounded-3xl h-64 border border-dashed border-gray-300 flex flex-col items-center justify-center text-center p-2 relative overflow-hidden">
+            {renderAssetPreview(afterAsset, 'Recent')}
+          </div>
           <select 
-            className="w-full p-3 rounded-xl border border-gray-200"
+            className="w-full p-3 rounded-xl border border-gray-200 text-xs font-medium"
             value={afterAssetId}
             onChange={(e) => setAfterAssetId(e.target.value)}
           >
-            <option value="">-- Choose Asset --</option>
-            {assets.map(a => <option key={a._id} value={a._id}>{a.originalFilename}</option>)}
+            <option value="">-- Choose Asset (Photo or Video) --</option>
+            {assets.map(a => (
+              <option key={a._id} value={a._id}>
+                {a.mediaType === 'video' ? '🎬 [Video] ' : '📷 [Photo] '}
+                {a.originalFilename} {a.duration ? `(${Math.round(a.duration)}s)` : ''}
+              </option>
+            ))}
           </select>
         </div>
       </div>

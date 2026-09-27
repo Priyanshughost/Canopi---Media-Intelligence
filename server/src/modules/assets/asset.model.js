@@ -21,6 +21,24 @@ const mediaAssetSchema = new mongoose.Schema(
     },
     originalFilename: { type: String },
     mediaType: { type: String, enum: ['image', 'video'], required: true },
+    duration: { type: Number }, // Video duration in seconds
+    thumbnailUrl: { type: String }, // Extracted frame poster
+    streamingUrl: { type: String }, // HLS/DASH or web-optimized MP4 stream
+    videoTranscript: [
+      {
+        startTime: { type: Number, required: true },
+        endTime: { type: Number, required: true },
+        description: { type: String, required: true },
+        confidence: { type: Number, default: 0.9 },
+        frameUrl: { type: String },
+      },
+    ],
+    videoMetadata: {
+      fps: { type: Number },
+      bitRate: { type: Number },
+      codec: { type: String },
+      resolution: { type: String },
+    },
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -70,6 +88,14 @@ const mediaAssetSchema = new mongoose.Schema(
     },
     moderation: { type: mongoose.Schema.Types.Mixed },
     flaggedForReview: { type: Boolean, default: false },
+    trustScore: { type: Number, default: 70, min: 0, max: 100 },
+    trustScoreBreakdown: [
+      {
+        factor: { type: String },
+        impact: { type: Number },
+        detail: { type: String },
+      },
+    ],
     processingStatus: {
       type: String,
       enum: ['UPLOADING', 'UPLOADED', 'ANALYZING', 'EMBEDDING', 'INDEXING', 'READY', 'FAILED'],

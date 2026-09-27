@@ -1,8 +1,9 @@
 import { API_URL } from '../config.js';
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Clock, MapPin } from 'lucide-react';
+import { LayoutGrid, Clock, MapPin, ShieldCheck } from 'lucide-react';
 import { MediaDetailModal } from '../components/MediaDetailModal';
+import { MultiFileUploadModal } from '../components/upload/MultiFileUploadModal';
 import { useStepSuccess } from '../context/StepSuccessContext';
 import {
   ProjectHeader,
@@ -10,6 +11,7 @@ import {
   ProjectGalleryTab,
   ProjectTimelineTab,
   ProjectLocationsTab,
+  ProjectClaimsTab,
 } from '../components/project';
 
 export const ProjectDetails = () => {
@@ -22,8 +24,9 @@ export const ProjectDetails = () => {
   const [duplicateAlert, setDuplicateAlert] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('gallery'); // 'gallery' | 'timeline' | 'locations'
+  const [activeTab, setActiveTab] = useState('gallery'); // 'gallery' | 'timeline' | 'locations' | 'claims'
 
   // Timeline State
   const [timelineData, setTimelineData] = useState([]);
@@ -36,6 +39,11 @@ export const ProjectDetails = () => {
   // Locations State
   const [locationsData, setLocationsData] = useState([]);
   const [locationsLoading, setLocationsLoading] = useState(false);
+
+  // Claims State
+  const [claimsData, setClaimsData] = useState(null);
+  const [claimsLoading, setClaimsLoading] = useState(false);
+  const [checkingClaims, setCheckingClaims] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -55,6 +63,45 @@ export const ProjectDetails = () => {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchClaims = useCallback(async () => {
+    setClaimsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/projects/${id}/claims`);
+      if (res.ok) {
+        const data = await res.json();
+        setClaimsData(data);
+      }
+    } catch (err) {
+      console.error('Failed to load claims:', err);
+    } finally {
+      setClaimsLoading(false);
+    }
+  }, [id]);
+
+  const handleRecheckClaims = async () => {
+    setCheckingClaims(true);
+    try {
+      const res = await fetch(`${API_URL}/api/projects/${id}/claims/check`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error('Claims check failed');
+      const data = await res.json();
+      setClaimsData(data);
+
+      triggerStepSuccess({
+        title: 'Claims Cross-Verified',
+        message: `Cross-checked ${data.summary?.total || 0} claims against visual evidence (${data.summary?.supported || 0} supported).`,
+        nextStepLabel: 'Generate Impact Report',
+        autoAdvance: false,
+        onNext: () => navigate('/reports'),
+      });
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setCheckingClaims(false);
     }
   };
 
@@ -95,15 +142,18 @@ export const ProjectDetails = () => {
 
   useEffect(() => {
     fetchData();
-  }, [id]);
+    fetchClaims();
+  }, [id, fetchClaims]);
 
   useEffect(() => {
     if (activeTab === 'timeline') {
       fetchTimeline();
     } else if (activeTab === 'locations') {
       fetchLocations();
+    } else if (activeTab === 'claims') {
+      fetchClaims();
     }
-  }, [activeTab, fetchTimeline, fetchLocations]);
+  }, [activeTab, fetchTimeline, fetchLocations, fetchClaims]);
 
   // Real-time polling for processing assets
   useEffect(() => {
@@ -199,6 +249,7 @@ export const ProjectDetails = () => {
         project={project}
         uploading={uploading}
         onFileUpload={handleFileUpload}
+        onOpenUploadModal={() => setIsUploadModalOpen(true)}
         onProjectDelete={handleProjectDelete}
       />
 
@@ -245,6 +296,27 @@ export const ProjectDetails = () => {
           <MapPin size={15} />
           <span>Locations</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('claims')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center space-x-2 transition-all ${
+            activeTab === 'claims'
+              ? 'bg-purple-700 text-white shadow-sm'
+              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+          }`}
+        >
+          <ShieldCheck size={15} />
+          <span>Claims Check</span>
+          {claimsData?.claims?.length > 0 && (
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                activeTab === 'claims' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'
+              }`}
+            >
+              {claimsData.claims.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Tab 1: Gallery */}
@@ -253,6 +325,7 @@ export const ProjectDetails = () => {
           assets={assets}
           onSelectAsset={setSelectedAsset}
           onAssetDelete={handleAssetDelete}
+          onOpenUploadModal={() => setIsUploadModalOpen(true)}
         />
       )}
 
@@ -282,6 +355,18 @@ export const ProjectDetails = () => {
         />
       )}
 
+      {/* Tab 4: Claims Consistency Check */}
+      {activeTab === 'claims' && (
+        <ProjectClaimsTab
+          claimsData={claimsData}
+          loading={claimsLoading}
+          checking={checkingClaims}
+          onRecheckClaims={handleRecheckClaims}
+          onSelectAsset={setSelectedAsset}
+          projectDescription={project.description}
+        />
+      )}
+
       {/* Media Detail Modal Inspector */}
       {selectedAsset && (
         <MediaDetailModal
@@ -293,6 +378,17 @@ export const ProjectDetails = () => {
           }}
         />
       )}
+
+      {/* Batch Multi-File Upload Modal */}
+      <MultiFileUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        projectId={id}
+        projectName={project.name}
+        onAssetUploaded={(newAsset) => {
+          setAssets((prev) => [newAsset, ...prev]);
+        }}
+      />
     </div>
   );
 };

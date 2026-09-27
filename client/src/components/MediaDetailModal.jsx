@@ -16,6 +16,7 @@ import {
   DerivativesTab,
   SignedDonorLinkTab,
 } from './mediaModal';
+import { TrustScoreBadge } from './common/TrustScoreBadge';
 
 export const MediaDetailModal = ({ asset, onClose, onAssetUpdated }) => {
   const [activeTab, setActiveTab] = useState('groq'); // 'groq' | 'cloudinary_vision' | 'derivatives' | 'signed_url'
@@ -130,6 +131,11 @@ export const MediaDetailModal = ({ asset, onClose, onAssetUpdated }) => {
                 <span>Verified Impact</span>
               </span>
             )}
+            <TrustScoreBadge
+              score={asset.trustScore ?? 70}
+              breakdown={asset.trustScoreBreakdown || []}
+              size="md"
+            />
           </div>
           <button
             onClick={onClose}

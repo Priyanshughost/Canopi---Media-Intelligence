@@ -97,3 +97,4 @@ export const deleteProject = async (req, res, next) => {
 
 export const getProjectTimeline = getProjectTimelineHandler;
 export const getProjectLocations = getProjectLocationsHandler;
+export { checkClaimsHandler as checkProjectClaims, getClaimsHandler as getProjectClaims } from '../claims/claim.controller.js';

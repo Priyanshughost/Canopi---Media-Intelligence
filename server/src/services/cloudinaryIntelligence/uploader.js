@@ -129,9 +129,22 @@ export const uploadWithIntelligence = async (filePath, options = {}) => {
     }
   }
 
+  const cloudName = cloudinary.config().cloud_name || 'djlbyyev9';
+  const duration = cloudResult.duration ? Math.round(cloudResult.duration) : mediaType === 'video' ? 15 : undefined;
+  const thumbnailUrl =
+    mediaType === 'video'
+      ? cloudResult.eager?.[0]?.secure_url ||
+        `https://res.cloudinary.com/${cloudName}/video/upload/c_thumb,w_600,h_400,so_0,f_jpg/${cloudResult.public_id}.jpg`
+      : undefined;
+  const streamingUrl =
+    mediaType === 'video' ? cloudResult.playback_url || cloudResult.secure_url : undefined;
+
   return {
     cloudResult,
     exifLocation,
+    duration,
+    thumbnailUrl,
+    streamingUrl,
     phash: cloudResult.phash || null,
     qualityAnalysis: cloudResult.quality_analysis || null,
     colors: cloudResult.colors || [],

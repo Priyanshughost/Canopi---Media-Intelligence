@@ -5,6 +5,7 @@ import { attachCloudinaryContext, createDerivedAsset } from './derivatives.js';
 import { analyzeWithCloudinaryVision } from './vision.js';
 import { syncAssetMetadataToCloudinary } from './metadataSync.js';
 import { generateSignedAssetUrl } from './signedUrl.js';
+import { analyzeVideoWithCloudinary, generateHighlightReel } from './videoAnalysis.js';
 import { uploadWithIntelligence } from './uploader.js';
 
 export {
@@ -17,6 +18,8 @@ export {
   attachCloudinaryContext,
   createDerivedAsset,
   analyzeWithCloudinaryVision,
+  analyzeVideoWithCloudinary,
+  generateHighlightReel,
   syncAssetMetadataToCloudinary,
   generateSignedAssetUrl,
   uploadWithIntelligence,
@@ -33,6 +36,8 @@ export const cloudinaryIntelligenceService = {
   attachCloudinaryContext,
   createDerivedAsset,
   analyzeWithCloudinaryVision,
+  analyzeVideoWithCloudinary,
+  generateHighlightReel,
   syncAssetMetadataToCloudinary,
   generateSignedAssetUrl,
 };

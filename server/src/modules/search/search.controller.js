@@ -37,23 +37,52 @@ export const semanticSearch = async (req, res, next) => {
       return res.json([]);
     }
 
-    // Extract asset IDs and map relevance scores
+    // Extract asset IDs and map relevance scores & video timestamp segments
     const matchMap = new Map();
-    const assetIds = searchResults.matches.map(match => {
-      const assetId = match.metadata.assetId;
-      matchMap.set(assetId, match.score);
-      return assetId;
+    const segmentMap = new Map();
+    const assetIds = [];
+
+    searchResults.matches.forEach((match) => {
+      const assetId = match.metadata?.assetId;
+      if (!assetId) return;
+
+      if (!assetIds.includes(assetId)) assetIds.push(assetId);
+
+      const existingScore = matchMap.get(assetId) || 0;
+      if (match.score > existingScore) {
+        matchMap.set(assetId, match.score);
+      }
+
+      if (match.metadata.startTime !== undefined && match.metadata.endTime !== undefined) {
+        if (!segmentMap.has(assetId)) {
+          segmentMap.set(assetId, {
+            start: match.metadata.startTime,
+            end: match.metadata.endTime,
+            text: match.metadata.text,
+            frameUrl: match.metadata.frameUrl,
+            score: match.score,
+          });
+        }
+      }
     });
 
     // Fetch full records from MongoDB to act as source of truth
     const assets = await MediaAsset.find({ _id: { $in: assetIds } });
 
-    // Sort by Pinecone score and attach score to result
-    const enrichedAssets = assets.map(asset => {
-      const doc = asset.toObject();
-      doc.relevanceScore = matchMap.get(doc._id.toString());
-      return doc;
-    }).sort((a, b) => b.relevanceScore - a.relevanceScore);
+    // Sort by Pinecone score and attach score & matched timestamp to result
+    const enrichedAssets = assets
+      .map((asset) => {
+        const doc = asset.toObject();
+        doc.relevanceScore = matchMap.get(doc._id.toString());
+        if (segmentMap.has(doc._id.toString())) {
+          const seg = segmentMap.get(doc._id.toString());
+          doc.matchedTimestamp = { start: seg.start, end: seg.end };
+          doc.matchedSnippet = seg.text;
+          doc.matchedFrameUrl = seg.frameUrl;
+        }
+        return doc;
+      })
+      .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
 
     res.json(enrichedAssets);
   } catch (error) {

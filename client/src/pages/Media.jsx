@@ -10,6 +10,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { MediaDetailModal } from '../components/MediaDetailModal';
+import { TrustScoreBadge } from '../components/common/TrustScoreBadge';
 
 export const Media = () => {
   const [assets, setAssets] = useState([]);
@@ -88,8 +89,11 @@ export const Media = () => {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {assets.map((asset) => {
             const thumbUrl =
+              asset.thumbnailUrl ||
               asset.derivatives?.find((d) => d.purpose === 'thumbnail')?.url ||
-              asset.cloudinary?.secureUrl;
+              (asset.mediaType === 'video'
+                ? `https://res.cloudinary.com/djlbyyev9/video/upload/c_thumb,w_600,h_400,so_0,f_jpg/${asset.cloudinary?.publicId}.jpg`
+                : asset.cloudinary?.secureUrl);
             const hasExif = asset.location?.source === 'exif';
             const hasEnhanced = Boolean(asset.enhancedVersion);
 
@@ -99,18 +103,25 @@ export const Media = () => {
                 onClick={() => setSelectedAsset(asset)}
                 className="bw-card-white overflow-hidden group cursor-pointer hover:shadow-xl transition-all rounded-2xl border border-gray-100"
               >
-                <div className="aspect-square bg-gray-100 relative overflow-hidden">
-                  {asset.mediaType === 'video' ? (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                      <Video size={32} className="text-gray-400" />
+                <div className="aspect-square bg-gray-900 relative overflow-hidden">
+                  <img
+                    src={thumbUrl}
+                    alt={asset.originalFilename}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    loading="lazy"
+                  />
+
+                  {asset.mediaType === 'video' && (
+                    <div className="absolute inset-0 bg-black/25 flex items-center justify-center group-hover:bg-black/40 transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-white/90 text-slate-900 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                        <Video size={18} className="ml-0.5" />
+                      </div>
+                      {asset.duration && (
+                        <span className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 text-white text-[10px] font-mono font-bold rounded">
+                          {Math.floor(asset.duration / 60)}:{(asset.duration % 60).toString().padStart(2, '0')}
+                        </span>
+                      )}
                     </div>
-                  ) : (
-                    <img
-                      src={thumbUrl}
-                      alt={asset.originalFilename}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      loading="lazy"
-                    />
                   )}
 
                   {/* Top Left Intelligence Badges */}
@@ -151,6 +162,14 @@ export const Media = () => {
                         <span>Verified</span>
                       </span>
                     )}
+                    {/* Evidence Trust Score Badge */}
+                    <div className="pt-0.5">
+                      <TrustScoreBadge
+                        score={asset.trustScore ?? 70}
+                        breakdown={asset.trustScoreBreakdown || []}
+                        size="sm"
+                      />
+                    </div>
                   </div>
 
                   {/* Top Right Processing Status Badge */}

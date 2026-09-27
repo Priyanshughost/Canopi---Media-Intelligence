@@ -19,12 +19,26 @@ export const generateComparison = async (req, res, next) => {
       return res.status(404).json({ error: 'One or both assets not found' });
     }
 
-    if (beforeAsset.mediaType !== 'image' || afterAsset.mediaType !== 'image') {
-      return res.status(400).json({ error: 'Both assets must be images for visual comparison' });
-    }
+    const cloudName = beforeAsset.cloudinary?.cloudName || 'djlbyyev9';
 
-    console.log(`[Comparison Controller] Calling Gemini for comparison...`);
-    const analysis = await compareImages(beforeAsset.cloudinary.secureUrl, afterAsset.cloudinary.secureUrl);
+    const getRepresentativeUrl = (asset) => {
+      if (asset.mediaType === 'video') {
+        return (
+          asset.thumbnailUrl ||
+          `https://res.cloudinary.com/${cloudName}/video/upload/c_thumb,w_800,h_600,so_0,f_jpg/${asset.cloudinary.publicId}.jpg`
+        );
+      }
+      return asset.enhancedVersion || asset.cloudinary.secureUrl;
+    };
+
+    const beforeUrl = getRepresentativeUrl(beforeAsset);
+    const afterUrl = getRepresentativeUrl(afterAsset);
+
+    console.log(`[Comparison Controller] Calling Visual Delta AI for comparison...`, {
+      beforeType: beforeAsset.mediaType,
+      afterType: afterAsset.mediaType,
+    });
+    const analysis = await compareImages(beforeUrl, afterUrl);
 
     // Automatically generate an Evidence record draft
     const evidenceDraft = new Evidence({

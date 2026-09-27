@@ -181,8 +181,10 @@ export const getProjectTimelineHandler = async (req, res, next) => {
         mediaType: asset.mediaType,
         secureUrl: asset.cloudinary?.secureUrl,
         thumbnailUrl:
+          asset.thumbnailUrl ||
           asset.derivatives?.find((d) => d.purpose === 'thumbnail')?.url ||
           asset.cloudinary?.secureUrl,
+        duration: asset.duration,
         enhancedVersion: asset.enhancedVersion,
         verified: asset.verified,
         location: asset.location,

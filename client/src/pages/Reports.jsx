@@ -10,9 +10,14 @@ import {
   LayoutTemplate,
   FileCode,
   Loader2,
+  Film,
 } from 'lucide-react';
 import { VisualReportRenderer } from '../components/report/VisualReportRenderer';
 import { CampaignPostsView } from '../components/report/CampaignPostsView';
+import { VisualStoryViewer } from '../components/report/VisualStoryViewer';
+import { CarouselPostViewer } from '../components/report/CarouselPostViewer';
+import { HighlightReelViewer } from '../components/report/HighlightReelViewer';
+import { SocialReelViewer } from '../components/report/SocialReelViewer';
 import { useStepSuccess } from '../context/StepSuccessContext';
 
 export const Reports = () => {
@@ -297,7 +302,7 @@ export const Reports = () => {
 
                   {/* Actions & View Mode Toggle */}
                   <div className="flex items-center space-x-2">
-                    {/* Visual vs Markdown Mode Switcher */}
+                    {/* Visual vs Story vs Markdown Mode Switcher */}
                     <div className="flex items-center bg-gray-100 p-1 rounded-xl">
                       <button
                         onClick={() =>
@@ -312,6 +317,68 @@ export const Reports = () => {
                         <LayoutTemplate size={13} />
                         <span>Visual Report</span>
                       </button>
+
+                      <button
+                        onClick={() =>
+                          setViewModes((prev) => ({ ...prev, [report._id]: 'story' }))
+                        }
+                        className={`px-3 py-1 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-all ${
+                          currentMode === 'story'
+                            ? 'bg-cyan-600 text-white shadow-sm'
+                            : 'text-cyan-700 hover:text-cyan-900 bg-cyan-50/60'
+                        }`}
+                      >
+                        <Sparkles size={13} />
+                        <span>Visual Story</span>
+                        {report.visualStory?.slides?.length > 0 && (
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${currentMode === 'story' ? 'bg-white/20 text-white' : 'bg-cyan-200 text-cyan-800'}`}>
+                            {report.visualStory.slides.length}
+                          </span>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          setViewModes((prev) => ({ ...prev, [report._id]: 'carousel' }))
+                        }
+                        className={`px-3 py-1 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-all ${
+                          currentMode === 'carousel'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-indigo-700 hover:text-indigo-900 bg-indigo-50/60'
+                        }`}
+                      >
+                        <Layers size={13} />
+                        <span>Carousel Post</span>
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          setViewModes((prev) => ({ ...prev, [report._id]: 'reel' }))
+                        }
+                        className={`px-3 py-1 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-all ${
+                          currentMode === 'reel'
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : 'text-purple-700 hover:text-purple-900 bg-purple-50/60'
+                        }`}
+                      >
+                        <Film size={13} />
+                        <span>Highlight Reel</span>
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          setViewModes((prev) => ({ ...prev, [report._id]: 'social_reels' }))
+                        }
+                        className={`px-3 py-1 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-all ${
+                          currentMode === 'social_reels'
+                            ? 'bg-pink-600 text-white shadow-sm'
+                            : 'text-pink-700 hover:text-pink-900 bg-pink-50/60'
+                        }`}
+                      >
+                        <Sparkles size={13} />
+                        <span>Social Reels</span>
+                      </button>
+
                       <button
                         onClick={() =>
                           setViewModes((prev) => ({ ...prev, [report._id]: 'markdown' }))
@@ -344,9 +411,45 @@ export const Reports = () => {
                   </div>
                 </div>
 
-                {/* Report Content Body: Visual vs Markdown */}
+                {/* Report Content Body: Visual vs Story vs Carousel vs Reel vs Social Reels vs Markdown */}
                 {currentMode === 'visual' ? (
                   <VisualReportRenderer report={report} />
+                ) : currentMode === 'story' ? (
+                  <VisualStoryViewer
+                    report={report}
+                    onStoryUpdated={(updatedReport) =>
+                      setReports((prev) =>
+                        prev.map((r) => (r._id === updatedReport._id ? updatedReport : r))
+                      )
+                    }
+                  />
+                ) : currentMode === 'carousel' ? (
+                  <CarouselPostViewer
+                    reportId={report._id}
+                    projectId={
+                      typeof report.projectId === 'object'
+                        ? report.projectId._id
+                        : report.projectId
+                    }
+                  />
+                ) : currentMode === 'reel' ? (
+                  <HighlightReelViewer
+                    reportId={report._id}
+                    projectId={
+                      typeof report.projectId === 'object'
+                        ? report.projectId._id
+                        : report.projectId
+                    }
+                  />
+                ) : currentMode === 'social_reels' ? (
+                  <SocialReelViewer
+                    reportId={report._id}
+                    projectId={
+                      typeof report.projectId === 'object'
+                        ? report.projectId._id
+                        : report.projectId
+                    }
+                  />
                 ) : (
                   <div className="space-y-6">
                     <div>

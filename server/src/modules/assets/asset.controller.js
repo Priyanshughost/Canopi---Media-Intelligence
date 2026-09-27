@@ -5,7 +5,8 @@ import { processAssetPipeline } from './asset.service.js';
 import {
   uploadWithIntelligence,
   findDuplicatesByPhash,
-} from '../../services/cloudinaryIntelligence.js';
+} from '../../services/cloudinaryIntelligence/index.js';
+import { calculateTrustScore } from '../../services/trustScore.js';
 import { cloudinaryService } from '../../integrations/cloudinary.js';
 
 export const uploadAsset = async (req, res, next) => {
@@ -31,20 +32,23 @@ export const uploadAsset = async (req, res, next) => {
     const mediaType = file.mimetype.startsWith('video/') ? 'video' : 'image';
 
     // 1. Upload to Cloudinary with native intelligence (metadata, phash, colors, quality_analysis, eager derivatives, moderation)
-    const {
-      cloudResult,
-      exifLocation,
-      phash,
-      qualityAnalysis,
-      colors,
-      enhancedVersion,
-      derivatives,
-      moderation,
-      flaggedForReview,
-    } = await uploadWithIntelligence(file.path, {
-      mediaType,
-      folder: 'canopi',
-    });
+      const {
+        cloudResult,
+        exifLocation,
+        duration,
+        thumbnailUrl,
+        streamingUrl,
+        phash,
+        qualityAnalysis,
+        colors,
+        enhancedVersion,
+        derivatives,
+        moderation,
+        flaggedForReview,
+      } = await uploadWithIntelligence(file.path, {
+        mediaType,
+        folder: 'canopi',
+      });
 
     // 2. Determine Location: EXIF if available, otherwise manual from body if provided
     let location = undefined;
@@ -81,11 +85,26 @@ export const uploadAsset = async (req, res, next) => {
       );
     }
 
-    // 4. Create Asset Record in MongoDB with full derivatives traceability chain and moderation flags
+    // 4. Calculate Initial Evidence Trust Score
+    const initialTrust = calculateTrustScore(
+      {
+        location,
+        phash,
+        qualityAnalysis,
+        flaggedForReview,
+        possibleDuplicates,
+      },
+      project
+    );
+
+    // 5. Create Asset Record in MongoDB with full derivatives traceability chain and moderation flags
     const asset = await MediaAsset.create({
       projectId,
       originalFilename: file.originalname,
       mediaType,
+      duration,
+      thumbnailUrl,
+      streamingUrl,
       location,
       phash,
       qualityAnalysis,
@@ -94,6 +113,8 @@ export const uploadAsset = async (req, res, next) => {
       derivatives: derivatives || [],
       moderation: moderation || [],
       flaggedForReview: Boolean(flaggedForReview),
+      trustScore: initialTrust.score,
+      trustScoreBreakdown: initialTrust.breakdown,
       metadata: cloudResult.image_metadata || cloudResult.exif || {},
       cloudinary: {
         publicId: cloudResult.public_id,
@@ -110,10 +131,10 @@ export const uploadAsset = async (req, res, next) => {
       processingStatus: 'UPLOADED',
     });
 
-    // 5. Trigger async AI processing pipeline without awaiting it
+    // 6. Trigger async AI processing pipeline without awaiting it
     processAssetPipeline(asset._id, file.path, file.mimetype).catch(console.error);
 
-    // 6. Expose possibleDuplicates in response along with asset fields
+    // 7. Expose possibleDuplicates & trustScore in response along with asset fields
     res.status(201).json({
       ...asset.toObject(),
       possibleDuplicates,
@@ -384,5 +405,32 @@ export const getSignedAssetUrl = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getAssetTrustScore = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const asset = await MediaAsset.findById(id);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    const project = await Project.findById(asset.projectId);
+    const trustResult = calculateTrustScore(asset, project);
+
+    asset.trustScore = trustResult.score;
+    asset.trustScoreBreakdown = trustResult.breakdown;
+    await asset.save();
+
+    res.json({
+      assetId: id,
+      trustScore: trustResult.score,
+      trustScoreBreakdown: trustResult.breakdown,
+      checkedAt: new Date(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 

@@ -5,6 +5,7 @@ import {
   getAssetById,
   getAssetDuplicates,
   getAssetDerivatives,
+  getAssetTrustScore,
   createDerivative,
   analyzeAssetWithCloudinaryVision,
   updateAsset,
@@ -22,6 +23,7 @@ router.post('/upload', upload.single('file'), uploadAsset);
 router.get('/', getAssets);
 router.get('/:id/duplicates', getAssetDuplicates);
 router.get('/:id/derivatives', getAssetDerivatives);
+router.get('/:id/trust-score', getAssetTrustScore);
 router.post('/:id/derivatives', createDerivative);
 router.post('/:id/analyze-vision', analyzeAssetWithCloudinaryVision);
 router.post('/:id/sync-metadata', syncAssetMetadata);
