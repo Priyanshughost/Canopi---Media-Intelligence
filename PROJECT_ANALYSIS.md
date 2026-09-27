@@ -266,6 +266,7 @@ graph TD
 | | `DELETE` | `/api/assets/:id` | Permanently delete asset from MongoDB & Cloudinary |
 | **Projects** | `GET` | `/api/projects` | List all projects with metadata |
 | | `POST` | `/api/projects` | Create new impact project |
+| | `POST` | `/api/projects/paraphrase-description` | Paraphrase and translate local language/informal project descriptions into professional English |
 | | `GET` | `/api/projects/:id` | Get single project details |
 | | `GET` | `/api/projects/:id/timeline` | Get chronologically grouped timeline (`groupBy=day\|week\|month`) |
 | | `GET` | `/api/projects/:id/locations` | Get geographic location clusters and centroids |

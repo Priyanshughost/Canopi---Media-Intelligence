@@ -4,6 +4,7 @@ import { Evidence } from '../evidence/evidence.model.js';
 import { cloudinaryService } from '../../integrations/cloudinary.js';
 import { getProjectTimelineHandler } from './project.timeline.js';
 import { getProjectLocationsHandler } from './project.locations.js';
+import { paraphraseProjectDescription } from '../../ai/groq.js';
 
 export const getProjectStats = async (req, res, next) => {
   try {
@@ -90,6 +91,28 @@ export const deleteProject = async (req, res, next) => {
     }
 
     res.json({ message: 'Project and all associated assets deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const paraphraseDescriptionHandler = async (req, res, next) => {
+  try {
+    const { description, name, organization, location } = req.body;
+    if (!description || !description.trim()) {
+      return res.status(400).json({ error: 'Description text is required for paraphrasing.' });
+    }
+
+    const paraphrased = await paraphraseProjectDescription(description, {
+      name,
+      organization,
+      location,
+    });
+
+    res.json({
+      original: description,
+      paraphrased,
+    });
   } catch (error) {
     next(error);
   }

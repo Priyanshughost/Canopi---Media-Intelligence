@@ -10,6 +10,7 @@ import {
   getProjectLocations,
   checkProjectClaims,
   getProjectClaims,
+  paraphraseDescriptionHandler,
 } from './project.controller.js';
 
 import {
@@ -20,6 +21,7 @@ import {
 const router = Router();
 
 router.get('/stats', getProjectStats);
+router.post('/paraphrase-description', paraphraseDescriptionHandler);
 router.post('/', createProject);
 router.get('/', getProjects);
 router.get('/:id/timeline', getProjectTimeline);
