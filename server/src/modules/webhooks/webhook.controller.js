@@ -96,7 +96,7 @@ export const handleCloudinaryWebhook = async (req, res, next) => {
 
       asset.moderation = moderationList;
       asset.flaggedForReview = moderationList.some(
-        (m) => m.status === 'rejected' || m.status === 'pending'
+        (m) => m.status === 'rejected'
       );
       updated = true;
       console.log(`[Webhook Controller] Moderation status updated: flaggedForReview=${asset.flaggedForReview}`);

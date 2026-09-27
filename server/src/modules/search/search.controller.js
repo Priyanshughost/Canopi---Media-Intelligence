@@ -1,6 +1,7 @@
 import { pineconeIndex } from '../../integrations/pinecone.js';
 import embeddings from '../../ai/embedding/embedding_model.js';
 import { MediaAsset } from '../assets/asset.model.js';
+import { Project } from '../projects/project.model.js';
 
 export const semanticSearch = async (req, res, next) => {
   try {
@@ -10,6 +11,12 @@ export const semanticSearch = async (req, res, next) => {
 
     if (!query) {
       return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    let orgProjectIds = null;
+    if (req.user?.organizationId) {
+      const orgProjects = await Project.find({ organizationId: req.user.organizationId }).select('_id');
+      orgProjectIds = orgProjects.map((p) => p._id.toString());
     }
 
     // Generate embedding for user query
@@ -66,8 +73,12 @@ export const semanticSearch = async (req, res, next) => {
       }
     });
 
-    // Fetch full records from MongoDB to act as source of truth
-    const assets = await MediaAsset.find({ _id: { $in: assetIds } });
+    // Fetch full records from MongoDB scoped to user's organization projects
+    const mongoFilter = { _id: { $in: assetIds } };
+    if (orgProjectIds) {
+      mongoFilter.projectId = { $in: orgProjectIds };
+    }
+    const assets = await MediaAsset.find(mongoFilter);
 
     // Sort by Pinecone score and attach score & matched timestamp to result
     const enrichedAssets = assets

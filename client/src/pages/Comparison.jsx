@@ -1,11 +1,13 @@
 import { API_URL } from '../config.js';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Wand2, Video, Image as ImageIcon, Play } from 'lucide-react';
+import { ArrowRight, Wand2, Video, Image as ImageIcon, Play, Folder } from 'lucide-react';
 import { useStepSuccess } from '../context/StepSuccessContext';
 
 export const Comparison = () => {
   const [assets, setAssets] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState('ALL');
   const [beforeAssetId, setBeforeAssetId] = useState('');
   const [afterAssetId, setAfterAssetId] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -17,14 +19,25 @@ export const Comparison = () => {
   const { triggerStepSuccess } = useStepSuccess();
 
   useEffect(() => {
-    fetch(`${API_URL}/api/assets`)
-      .then(res => res.json())
-      .then(data => setAssets(Array.isArray(data) ? data : []))
-      .catch(err => console.error("Failed to load assets", err));
+    Promise.all([
+      fetch(`${API_URL}/api/assets`).then((res) => res.json()),
+      fetch(`${API_URL}/api/projects`).then((res) => res.json()),
+    ])
+      .then(([assetsData, projectsData]) => {
+        setAssets(Array.isArray(assetsData) ? assetsData : []);
+        setProjects(Array.isArray(projectsData) ? projectsData : []);
+      })
+      .catch((err) => console.error('Failed to load comparison data', err));
   }, []);
 
-  const beforeAsset = assets.find(a => a._id === beforeAssetId);
-  const afterAsset = assets.find(a => a._id === afterAssetId);
+  const filteredAssets = assets.filter((a) => {
+    if (selectedProjectId === 'ALL') return true;
+    const pId = typeof a.projectId === 'object' ? a.projectId?._id : a.projectId;
+    return pId === selectedProjectId;
+  });
+
+  const beforeAsset = assets.find((a) => a._id === beforeAssetId);
+  const afterAsset = assets.find((a) => a._id === afterAssetId);
 
   const renderAssetPreview = (asset, label) => {
     if (!asset) {
@@ -118,6 +131,35 @@ export const Comparison = () => {
         </div>
       </div>
 
+      {/* Project Selector Filter */}
+      {projects.length > 0 && (
+        <div className="bg-gray-50/80 border border-gray-200/80 rounded-2xl p-3.5 flex items-center space-x-3">
+          <div className="flex items-center space-x-2 text-xs font-bold text-gray-700">
+            <Folder size={15} className="text-gray-500" />
+            <span>Filter Media by Project:</span>
+          </div>
+          <select
+            value={selectedProjectId}
+            onChange={(e) => {
+              setSelectedProjectId(e.target.value);
+              setBeforeAssetId('');
+              setAfterAssetId('');
+            }}
+            className="flex-1 max-w-sm bg-white border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-xs focus:ring-2 focus:ring-black focus:outline-hidden"
+          >
+            <option value="ALL">All Projects ({projects.length})</option>
+            {projects.map((proj) => (
+              <option key={proj._id} value={proj._id}>
+                {proj.title || proj.name} {proj.location ? `— ${proj.location}` : ''}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-gray-500">
+            ({filteredAssets.length} visual{filteredAssets.length === 1 ? '' : 's'} available)
+          </span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Before Asset Selection */}
         <div className="space-y-4">
@@ -138,7 +180,7 @@ export const Comparison = () => {
             onChange={(e) => setBeforeAssetId(e.target.value)}
           >
             <option value="">-- Choose Asset (Photo or Video) --</option>
-            {assets.map(a => (
+            {filteredAssets.map(a => (
               <option key={a._id} value={a._id}>
                 {a.mediaType === 'video' ? '🎬 [Video] ' : '📷 [Photo] '}
                 {a.originalFilename} {a.duration ? `(${Math.round(a.duration)}s)` : ''}
@@ -166,7 +208,7 @@ export const Comparison = () => {
             onChange={(e) => setAfterAssetId(e.target.value)}
           >
             <option value="">-- Choose Asset (Photo or Video) --</option>
-            {assets.map(a => (
+            {filteredAssets.map(a => (
               <option key={a._id} value={a._id}>
                 {a.mediaType === 'video' ? '🎬 [Video] ' : '📷 [Photo] '}
                 {a.originalFilename} {a.duration ? `(${Math.round(a.duration)}s)` : ''}

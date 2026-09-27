@@ -201,6 +201,10 @@ export const MultiFileUploadModal = ({
       };
 
       xhr.open('POST', `${API_URL}/api/assets/upload`, true);
+      const token = localStorage.getItem('canopi_token');
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
       xhr.send(formData);
     });
   };

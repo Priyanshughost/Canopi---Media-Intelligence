@@ -71,11 +71,22 @@ export const Reports = () => {
       return;
     }
 
-    const projEvidence = evidenceList.filter(
-      (e) => e.projectId === selectedProjectId && e.verified
-    );
+    const projEvidence = evidenceList.filter((e) => {
+      const pId = typeof e.projectId === 'object' && e.projectId !== null ? e.projectId._id : e.projectId;
+      return pId === selectedProjectId && e.verified;
+    });
+
     if (projEvidence.length === 0) {
-      alert('No verified evidence found for this project. Please verify some evidence first.');
+      const totalForProj = evidenceList.filter((e) => {
+        const pId = typeof e.projectId === 'object' && e.projectId !== null ? e.projectId._id : e.projectId;
+        return pId === selectedProjectId;
+      }).length;
+
+      if (totalForProj > 0) {
+        alert(`Found ${totalForProj} evidence item(s) for this project, but none are verified yet. Please go to Evidence & Verification to verify your evidence first.`);
+      } else {
+        alert('No evidence found for this project yet. Please create a Before / After Comparison first to draft evidence.');
+      }
       return;
     }
 
@@ -90,7 +101,10 @@ export const Reports = () => {
         }),
       });
 
-      if (!response.ok) throw new Error('Generation failed');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Report generation failed');
+      }
       const newReport = await response.json();
 
       setReports((prev) => [newReport, ...prev]);
@@ -233,24 +247,32 @@ export const Reports = () => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3 bg-white p-2 rounded-2xl shadow-sm border border-gray-100">
-          <select
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="p-2 border-none outline-none text-gray-700 bg-transparent font-medium text-xs"
-          >
-            <option value="">-- Select Project to Report --</option>
-            {projects.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white p-2 rounded-2xl shadow-xs border border-gray-100">
+          <div className="flex items-center space-x-2">
+            <select
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="p-2 border border-gray-200 rounded-xl outline-hidden text-gray-700 bg-white font-semibold text-xs shadow-xs"
+            >
+              <option value="">-- Select Project to Report --</option>
+              {projects.map((p) => {
+                const count = evidenceList.filter((e) => {
+                  const pId = typeof e.projectId === 'object' && e.projectId !== null ? e.projectId._id : e.projectId;
+                  return pId === p._id && e.verified;
+                }).length;
+                return (
+                  <option key={p._id} value={p._id}>
+                    {p.title || p.name} ({count} verified evidence)
+                  </option>
+                );
+              })}
+            </select>
+          </div>
 
           <button
             onClick={handleGenerate}
             disabled={isGenerating || !selectedProjectId}
-            className="bw-btn-black px-5 py-2.5 rounded-xl text-gray-100 text-xs font-semibold flex items-center space-x-2 disabled:opacity-50"
+            className="bw-btn-black px-5 py-2.5 rounded-xl text-gray-100 text-xs font-semibold flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer shadow-xs"
           >
             {isGenerating ? (
               <Loader2 size={16} className="animate-spin text-cyan-400" />

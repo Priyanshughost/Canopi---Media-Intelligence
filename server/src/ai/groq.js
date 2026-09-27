@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { gpt120b } from "./models/gpt-120b.js";
+import { gemini_3_8_flash } from "./models/gemini.js";
 
 const ReportSchema = z.object({
   title: z.string(),
@@ -9,45 +10,100 @@ const ReportSchema = z.object({
 });
 
 export const generateProjectReport = async (project, evidenceData) => {
-  const modelWithStructuredOutput = gpt120b.withStructuredOutput(ReportSchema);
-  
+  // 1. Compact payload to essential fields to prevent token limit exceed / 413 errors
+  const compactProject = {
+    title: project?.title || project?.name || 'Environmental Impact Initiative',
+    description: project?.description || '',
+    location: project?.location || '',
+    category: project?.category || '',
+  };
+
+  const compactEvidence = (Array.isArray(evidenceData) ? evidenceData : [evidenceData]).map((e) => ({
+    title: e.title,
+    type: e.type,
+    description: e.description,
+    observations: e.observations?.map((o) =>
+      typeof o === 'string' ? o : `${o.category || 'Observation'}: ${o.change || o.text || ''}`
+    ),
+    keyVisualFindings: e.sourceAssets
+      ?.flatMap((a) => a.aiAnalysis?.visualSignals || [a.aiAnalysis?.description])
+      .filter(Boolean)
+      .slice(0, 4),
+  }));
+
   const prompt = `You are a professional impact analyst. Generate a structured report based on the following project data and evidence. Make sure to adhere strictly to the "OBSERVATION != PROOF" rule.
 
-Project: ${JSON.stringify(project)}
-Evidence: ${JSON.stringify(evidenceData)}`;
+Project: ${JSON.stringify(compactProject)}
+Evidence: ${JSON.stringify(compactEvidence)}`;
 
-  console.log(`[AI Trigger] Starting Groq Report Generation for Project: ${project.name}`);
+  console.log(`[AI Trigger] Starting Groq Report Generation for Project: ${compactProject.title}`);
 
+  // 1. Try Groq (gpt-120b)
   try {
+    const modelWithStructuredOutput = gpt120b.withStructuredOutput(ReportSchema);
     const result = await modelWithStructuredOutput.invoke(prompt);
-    
     console.log('[AI Output] Groq Report Generation Response:');
     console.dir(result, { depth: null, colors: true });
     return result;
-  } catch (error) {
-    console.error("Failed to generate project report:", error);
-    throw new Error("Report generation failed.");
+  } catch (groqError) {
+    console.warn('[AI Report] Groq report generation rate-limited or failed, falling back to Gemini:', groqError.message);
+  }
+
+  // 2. Fallback to Gemini 2.5 Pro
+  try {
+    console.log(`[AI Trigger] Starting Gemini Fallback Report Generation for Project: ${compactProject.title}`);
+    const geminiStructured = gemini_3_8_flash.withStructuredOutput(ReportSchema);
+    const result = await geminiStructured.invoke(prompt);
+    console.log('[AI Output] Gemini Report Generation Response:');
+    console.dir(result, { depth: null, colors: true });
+    return result;
+  } catch (geminiError) {
+    console.error('[AI Report] Gemini fallback report generation failed:', geminiError.message);
+    throw new Error('Report generation failed with both Groq and Gemini AI.');
   }
 };
 
 export const generateCampaignContent = async (project, evidence) => {
-  const prompt = `You are a social media campaign manager. Generate campaign content for the following project and evidence.
+  const compactProject = {
+    title: project?.title || project?.name || 'Environmental Impact Initiative',
+    description: project?.description || '',
+    location: project?.location || '',
+  };
 
-Project: ${JSON.stringify(project)}
-Evidence: ${JSON.stringify(evidence)}
+  const compactEvidence = {
+    title: evidence?.title,
+    description: evidence?.description,
+    observations: evidence?.observations?.map((o) =>
+      typeof o === 'string' ? o : `${o.category || 'Obs'}: ${o.change || o.text || ''}`
+    ),
+  };
 
-Output just the campaign content text.`;
+  const prompt = `You are a social media campaign manager. Generate inspiring campaign copy for the following project and evidence.
 
-  console.log(`[AI Trigger] Starting Groq Campaign Generation for Project: ${project.name}`);
+Project: ${JSON.stringify(compactProject)}
+Evidence: ${JSON.stringify(compactEvidence)}
 
+Output just the campaign content text with engaging hashtags.`;
+
+  console.log(`[AI Trigger] Starting Campaign Generation for Project: ${compactProject.title}`);
+
+  // 1. Try Groq
   try {
     const result = await gpt120b.invoke(prompt);
-    
     console.log(`[AI Output] Groq Campaign Generation Response:\n${result.content}`);
     return result.content;
-  } catch (error) {
-    console.error("Failed to generate campaign content:", error);
-    throw new Error("Campaign generation failed.");
+  } catch (groqError) {
+    console.warn('[AI Campaign] Groq campaign generation failed, falling back to Gemini:', groqError.message);
+  }
+
+  // 2. Fallback to Gemini
+  try {
+    const result = await gemini_3_8_flash.invoke(prompt);
+    console.log(`[AI Output] Gemini Campaign Generation Response:\n${result.content}`);
+    return result.content;
+  } catch (geminiError) {
+    console.error('[AI Campaign] Gemini campaign generation failed:', geminiError.message);
+    throw new Error('Campaign generation failed.');
   }
 };
 

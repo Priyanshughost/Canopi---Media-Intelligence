@@ -17,8 +17,12 @@ import {
   createProjectCarousel,
   getProjectCarousel,
 } from '../carousel/carousel.controller.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 
 const router = Router();
+
+// Protect all project routes with authentication
+router.use(authenticate);
 
 router.get('/stats', getProjectStats);
 router.post('/paraphrase-description', paraphraseDescriptionHandler);

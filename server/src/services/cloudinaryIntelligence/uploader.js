@@ -72,7 +72,7 @@ export const uploadWithIntelligence = async (filePath, options = {}) => {
   // 3. Extract moderation analysis
   const moderationResult = cloudResult.moderation || [];
   const flaggedForReview = moderationResult.some(
-    (m) => m.status === 'rejected' || m.status === 'pending'
+    (m) => m.status === 'rejected'
   );
 
   // 4. Build Derivatives Traceability Chain

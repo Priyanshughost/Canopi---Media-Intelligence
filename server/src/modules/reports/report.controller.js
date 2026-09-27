@@ -198,7 +198,21 @@ export const generateReport = async (req, res, next) => {
 export const getReports = async (req, res, next) => {
   try {
     const { projectId } = req.query;
-    const filter = projectId ? { projectId } : {};
+    const filter = {};
+
+    if (projectId) {
+      if (req.user?.organizationId) {
+        const project = await Project.findOne({ _id: projectId, organizationId: req.user.organizationId });
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found or access denied.' });
+        }
+      }
+      filter.projectId = projectId;
+    } else if (req.user?.organizationId) {
+      const orgProjects = await Project.find({ organizationId: req.user.organizationId }).select('_id');
+      const orgProjectIds = orgProjects.map((p) => p._id);
+      filter.projectId = { $in: orgProjectIds };
+    }
 
     console.log('[Report Controller] Fetching reports', { filter });
 

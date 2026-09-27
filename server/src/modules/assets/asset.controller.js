@@ -23,7 +23,11 @@ export const uploadAsset = async (req, res, next) => {
       return res.status(400).json({ error: 'file is required' });
     }
 
-    const project = await Project.findById(projectId);
+    const projectFilter = { _id: projectId };
+    if (req.user?.organizationId) {
+      projectFilter.organizationId = req.user.organizationId;
+    }
+    const project = await Project.findOne(projectFilter);
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -226,7 +230,21 @@ export const getAssets = async (req, res, next) => {
   try {
     const { projectId, type } = req.query;
     const filter = {};
-    if (projectId) filter.projectId = projectId;
+
+    if (projectId) {
+      if (req.user?.organizationId) {
+        const project = await Project.findOne({ _id: projectId, organizationId: req.user.organizationId });
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found or access denied.' });
+        }
+      }
+      filter.projectId = projectId;
+    } else if (req.user?.organizationId) {
+      const orgProjects = await Project.find({ organizationId: req.user.organizationId }).select('_id');
+      const orgProjectIds = orgProjects.map((p) => p._id);
+      filter.projectId = { $in: orgProjectIds };
+    }
+
     if (type) filter.mediaType = type;
 
     console.log('[Asset Controller] Fetching assets', { filter });
@@ -432,5 +450,71 @@ export const getAssetTrustScore = async (req, res, next) => {
   }
 };
 
+export const reviewAsset = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { flaggedForReview } = req.body;
+    const asset = await MediaAsset.findById(id);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
 
+    // Toggle or explicitly set flaggedForReview
+    asset.flaggedForReview = typeof flaggedForReview === 'boolean' ? flaggedForReview : false;
+    await asset.save();
 
+    res.json({
+      success: true,
+      message: 'Asset review status updated',
+      asset,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reAnalyzeAsset = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const asset = await MediaAsset.findById(id);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    // Run pipeline synchronously or trigger and return
+    await processAssetPipeline(asset._id, null, asset.mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
+    const updatedAsset = await MediaAsset.findById(id);
+
+    res.json({
+      success: true,
+      message: 'Asset AI analysis re-processed successfully',
+      asset: updatedAsset,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reAnalyzeProjectAssets = async (req, res, next) => {
+  try {
+    const { projectId } = req.params;
+    const assets = await MediaAsset.find({ projectId });
+    
+    // Process all unanalyzed assets sequentially with small delay to prevent rate limits
+    for (const asset of assets) {
+      if (!asset.aiAnalysis?.description) {
+        await processAssetPipeline(asset._id, null, asset.mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
+        await new Promise((r) => setTimeout(r, 600));
+      }
+    }
+
+    const updatedAssets = await MediaAsset.find({ projectId });
+    res.json({
+      success: true,
+      message: 'All project assets re-analyzed',
+      assets: updatedAssets,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

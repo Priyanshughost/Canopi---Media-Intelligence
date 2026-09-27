@@ -39,7 +39,19 @@ export const processAssetPipeline = async (assetId, filePath, mimeType) => {
         aiAnalysis.model = { provider: 'Groq/Qwen', model: 'qwen-27b' };
         asset.aiAnalysis = aiAnalysis;
       } else {
-        console.error(`[Pipeline] Groq analysis failed for ${assetId}:`, groqRes.reason?.message);
+        console.warn(`[Pipeline] Groq analysis initial attempt failed for ${assetId}:`, groqRes.reason?.message);
+        // Attempt retry with backoff for rate-limited multi-uploads
+        try {
+          await new Promise((r) => setTimeout(r, 1500));
+          const retryRes = await analyzeImage(asset.enhancedVersion || asset.cloudinary.secureUrl);
+          aiAnalysis = retryRes;
+          aiAnalysis.analyzedAt = new Date();
+          aiAnalysis.model = { provider: 'Groq/Qwen', model: 'qwen-27b' };
+          asset.aiAnalysis = aiAnalysis;
+          console.log(`[Pipeline] Groq analysis succeeded on retry for ${assetId}`);
+        } catch (retryErr) {
+          console.error(`[Pipeline] Groq retry failed for ${assetId}:`, retryErr.message);
+        }
       }
 
       if (cloudVisionRes.status === 'fulfilled') {
@@ -50,6 +62,31 @@ export const processAssetPipeline = async (assetId, filePath, mimeType) => {
           `[Pipeline] Cloudinary Vision analysis failed for ${assetId}:`,
           cloudVisionRes.reason?.message
         );
+      }
+
+      // If Groq analysis failed but Cloudinary Vision succeeded, synthesize aiAnalysis from Vision VQA
+      if (!asset.aiAnalysis?.description && cloudinaryVisionAnalysis) {
+        const qaList = cloudinaryVisionAnalysis.questions || cloudinaryVisionAnalysis.answers || [];
+        const descQA = qaList.find((q) => /what|describe|overview/i.test(q.question || ''))?.answer;
+        const envQA = qaList.find((q) => /environment|setting|terrain|where/i.test(q.question || ''))?.answer;
+        const objQA = qaList.find((q) => /objects|materials|items/i.test(q.question || ''))?.answer;
+
+        const synthDesc = [descQA, envQA].filter(Boolean).join(' ') || 'Field evidence visual documentation.';
+        const synthObjects = objQA
+          ? objQA.split(/[,.]/).map((s) => s.trim().toLowerCase()).filter(Boolean)
+          : ['environmental evidence'];
+
+        asset.aiAnalysis = {
+          description: synthDesc,
+          objects: synthObjects.slice(0, 8),
+          activities: ['environmental observation', 'field monitoring'],
+          tags: ['field_evidence', 'environment', 'monitoring', ...(project?.category ? [project.category.toLowerCase()] : [])],
+          visualSignals: [descQA || 'Visual confirmation of site conditions'],
+          model: { provider: 'Cloudinary Vision', model: 'vqa-fallback' },
+          analyzedAt: new Date(),
+        };
+        aiAnalysis = asset.aiAnalysis;
+        console.log(`[Pipeline] Synthesized AI analysis from Cloudinary Vision for ${assetId}`);
       }
 
       await asset.save();

@@ -24,6 +24,7 @@ Canopi provides an end-to-end, Cloudinary-native AI media intelligence pipeline 
 ```mermaid
 graph TD
     subgraph Client Layer [Frontend - React 19 + Vite + Tailwind CSS v4]
+        AuthUI[Login, Signup & Invite Teammate]
         DashboardUI[Dashboard & Metrics]
         ProjectDetailsUI[Project Hub: Gallery, Timeline, Locations, Claims]
         MultiUploadUI[Batch Multi-File Dropzone & Live Progress]
@@ -35,6 +36,7 @@ graph TD
     end
 
     subgraph API & Controller Layer [Backend - Node.js Express 5 ES Modules]
+        AuthCtrl[JWT Authentication & Org Scoping]
         AssetCtrl[Asset Ingestion & Video Pipeline]
         ProjectCtrl[Project, Timeline & Locations API]
         ClaimsCtrl[Claim Consistency Check Engine]
@@ -66,11 +68,11 @@ graph TD
     end
 
     subgraph Persistence Layer
-        MongoDB[(MongoDB: Projects, Assets, Evidence, Claims, Reports, Carousels)]
+        MongoDB[(MongoDB: Organizations, Users, Projects, Assets, Evidence, Claims, Reports, Carousels)]
     end
 
     %% Client to API
-    Client Layer <-->|REST API / Multipart Upload| API & Controller Layer
+    Client Layer <-->|REST API / Bearer JWT / Multipart Upload| API & Controller Layer
 
     %% Asset Ingestion Flow
     AssetCtrl --> UploadEngine
@@ -253,15 +255,41 @@ graph TD
 
 ---
 
+### 🔐 13. Organization-Based Multi-Tenancy & Authentication System
+* **Data Isolation by Organization**: Every project, asset, evidence item, and report belongs strictly to its owning organization (NGO, CSR, Government, or Other). Cross-organization data leakage is completely blocked via route-level scoping.
+* **Zero Role Friction**: Full member parity where any authenticated teammate can upload media, verify evidence, check claims, and generate reports.
+* **Pre-Seeded Demo Account**: Instant one-click reviewer login (`demo@canopi.test` / `Demo@1234`) pre-loaded with Demo NGO projects and media assets for frictionless judge evaluation.
+* **Teammate Collaboration**: In-app invite system to easily add team members into the organization workspace.
+* **Source Files**: [user.model.js](file:///g:/Canopi---Media-Intelligence/server/src/modules/auth/user.model.js), [organization.model.js](file:///g:/Canopi---Media-Intelligence/server/src/modules/auth/organization.model.js), [auth.controller.js](file:///g:/Canopi---Media-Intelligence/server/src/modules/auth/auth.controller.js), [auth.middleware.js](file:///g:/Canopi---Media-Intelligence/server/src/middleware/auth.middleware.js), [seedDemoAccount.js](file:///g:/Canopi---Media-Intelligence/server/src/scripts/seedDemoAccount.js), [Login.jsx](file:///g:/Canopi---Media-Intelligence/client/src/pages/Login.jsx), [Signup.jsx](file:///g:/Canopi---Media-Intelligence/client/src/pages/Signup.jsx).
+
+---
+
+### 🌐 14. Multilingual Local Language Ingestion & AI Paraphrase Engine
+* **Local Language Field Notes**: Enables field officers to draft project descriptions in Hindi, Hinglish, regional languages, or colloquial drafts.
+* **Groq Bilingual Paraphrasing**: Automatically translates and polishes local notes into professional, high-impact English descriptions structured for donor reporting and audit compliance.
+* **Non-Destructive Revert**: Includes instant "Undo AI" toggle to review original field input alongside polished English output.
+* **Source Files**: [groq.js](file:///g:/Canopi---Media-Intelligence/server/src/ai/groq.js), [project.controller.js](file:///g:/Canopi---Media-Intelligence/server/src/modules/projects/project.controller.js), [CreateProjectModal.jsx](file:///g:/Canopi---Media-Intelligence/client/src/components/CreateProjectModal.jsx).
+
+---
+
 ## 5. Summary Table of API Endpoints
 
 | Category | Method | Endpoint | Description |
 | :--- | :--- | :--- | :--- |
+| **Auth** | `POST` | `/api/auth/signup` | Create new Organization & first User, returns JWT |
+| | `POST` | `/api/auth/login` | Authenticate email/password, returns JWT & user/org details |
+| | `GET` | `/api/auth/demo-credentials` | Expose public test account (`demo@canopi.test` / `Demo@1234`) for one-click reviewer login |
+| | `GET` | `/api/auth/me` | Retrieve current authenticated user profile & organization |
+| | `POST` | `/api/auth/invite-teammate` | Add teammate into the caller's organization |
+| | `POST` | `/api/auth/logout` | Client-side session clear acknowledgment |
 | **Assets** | `POST` | `/api/assets/upload` | Ingest photo or video to Cloudinary with native AI analysis & Pinecone indexing |
 | | `GET` | `/api/assets` | List assets (filtered by `projectId`, `mediaType`, `status`) |
 | | `GET` | `/api/assets/:id` | Get asset details, AI transcript, quality score & trust breakdown |
 | | `GET` | `/api/assets/:id/trust-score` | Calculate and return unified trust score (0–100) |
 | | `GET` | `/api/assets/:id/signed-url` | Generate time-limited authenticated delivery URL |
+| | `PUT` | `/api/assets/:id/review` | Manual approval and review flag toggle for assets |
+| | `POST` | `/api/assets/:id/re-analyze` | Re-run AI analysis and vector indexing on single asset |
+| | `POST` | `/api/assets/project/:projectId/re-analyze` | Batch re-analyze all unanalyzed assets in a project |
 | | `POST` | `/api/assets/:id/sync-metadata` | Sync local metadata back into Cloudinary context |
 | | `DELETE` | `/api/assets/:id` | Permanently delete asset from MongoDB & Cloudinary |
 | **Projects** | `GET` | `/api/projects` | List all projects with metadata |
@@ -306,11 +334,12 @@ graph TD
 
 ## 7. Verification & Automated Test Suite
 
-All 48 backend automated tests pass cleanly with zero failures:
+All 55 backend automated tests pass cleanly with zero failures:
 ```bash
 > node --test tests/*.test.js
 
 ✔ Cloudinary AI Impact Platform API Tests (8 tests)
+✔ Authentication & Organization Scoping Service Tests (6 tests)
 ✔ Carousel Post Generator Service Tests (1 test)
 ✔ Claim Consistency Check Service Tests (6 tests)
 ✔ Cloudinary Intelligence Service Unit Tests (14 tests)
@@ -319,7 +348,7 @@ All 48 backend automated tests pass cleanly with zero failures:
 ✔ Visual Story Generator Service Tests (4 tests)
 ✔ Claim Consistency Safeguard Tests (2 tests)
 
-ℹ tests 48 | suites 4 | pass 48 | fail 0 | cancelled 0
+ℹ tests 55 | suites 4 | pass 55 | fail 0 | cancelled 0
 ```
 
 Frontend bundle compiles cleanly with Vite:

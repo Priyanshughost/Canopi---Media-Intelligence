@@ -31,6 +31,7 @@ export const MediaDetailModal = ({ asset, onClose, onAssetUpdated }) => {
   const [signedData, setSignedData] = useState(null);
   const [generatingSigned, setGeneratingSigned] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [clearingFlag, setClearingFlag] = useState(false);
 
   if (!asset) return null;
 
@@ -42,6 +43,26 @@ export const MediaDetailModal = ({ asset, onClose, onAssetUpdated }) => {
 
   const currentDisplayUrl =
     viewEnhanced && asset.enhancedVersion ? asset.enhancedVersion : asset.cloudinary?.secureUrl;
+
+  const handleClearFlag = async () => {
+    setClearingFlag(true);
+    try {
+      const res = await fetch(`${API_URL}/api/assets/${asset._id}/review`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flaggedForReview: false }),
+      });
+      if (!res.ok) throw new Error('Failed to update review status');
+      const data = await res.json();
+      if (onAssetUpdated) {
+        onAssetUpdated(data.asset || { ...asset, flaggedForReview: false });
+      }
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setClearingFlag(false);
+    }
+  };
 
   const handleAskCloudinaryVision = async (e) => {
     e.preventDefault();
@@ -121,10 +142,22 @@ export const MediaDetailModal = ({ asset, onClose, onAssetUpdated }) => {
               {asset.mediaType?.toUpperCase()}
             </span>
             {asset.flaggedForReview && (
-              <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 flex items-center space-x-1">
-                <ShieldAlert size={12} />
-                <span>Review Flagged</span>
-              </span>
+              <div className="flex items-center space-x-1.5">
+                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 flex items-center space-x-1">
+                  <ShieldAlert size={12} />
+                  <span>Review Flagged</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearFlag}
+                  disabled={clearingFlag}
+                  className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center space-x-1 shadow-xs cursor-pointer disabled:opacity-60"
+                  title="Approve and mark asset as clear"
+                >
+                  <CheckCircle size={12} />
+                  <span>{clearingFlag ? 'Approving...' : 'Approve'}</span>
+                </button>
+              </div>
             )}
             {asset.verified && (
               <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800 flex items-center space-x-1">

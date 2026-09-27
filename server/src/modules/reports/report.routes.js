@@ -14,8 +14,11 @@ import {
   createReportCarousel,
   getReportCarousel,
 } from '../carousel/carousel.controller.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 
 const router = Router();
+
+router.use(authenticate);
 
 router.post('/generate', generateReport);
 router.post('/campaign', generateCampaign);
