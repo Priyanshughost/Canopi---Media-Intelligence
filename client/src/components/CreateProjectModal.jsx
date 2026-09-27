@@ -31,7 +31,9 @@ export const CreateProjectModal = ({ isOpen, onClose, onSuccess }) => {
 
       if (!res.ok) throw new Error('Failed to create project');
       const newProj = await res.json();
-      onSuccess(newProj);
+      if (typeof onSuccess === 'function') {
+        onSuccess(newProj);
+      }
       onClose();
       // Reset form
       setFormData({

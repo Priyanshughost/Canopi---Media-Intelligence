@@ -1,11 +1,9 @@
 import { API_URL } from '../config.js';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, ArrowRight, Activity, MapPin, CheckCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
-
-
 import { CreateProjectModal } from '../components/CreateProjectModal';
-
+import { useStepSuccess } from '../context/StepSuccessContext';
 import { useState, useEffect } from 'react';
 
 export const Dashboard = () => {
@@ -16,6 +14,19 @@ export const Dashboard = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  const { triggerStepSuccess } = useStepSuccess();
+
+  const handleNewProjectSuccess = (newProj) => {
+    setProjects((prev) => [newProj, ...prev.slice(0, 2)]);
+    triggerStepSuccess({
+      title: 'Project Created',
+      message: `"${newProj.name}" created. Next: Upload visual media assets.`,
+      nextStepLabel: 'Upload Media',
+      autoAdvanceSeconds: 5,
+      onNext: () => navigate(`/projects/${newProj._id}`),
+    });
+  };
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -122,10 +133,6 @@ export const Dashboard = () => {
     };
     fetchProjects();
   }, []);
-
-  const handleNewProjectSuccess = (newProj) => {
-    setProjects([newProj, ...projects]);
-  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">

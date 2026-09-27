@@ -1,6 +1,8 @@
 import { API_URL } from '../config.js';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Wand2 } from 'lucide-react';
+import { useStepSuccess } from '../context/StepSuccessContext';
 
 export const Comparison = () => {
   const [assets, setAssets] = useState([]);
@@ -11,6 +13,8 @@ export const Comparison = () => {
   const [draftEvidence, setDraftEvidence] = useState(null);
   const [error, setError] = useState(null);
   const [drafting, setDrafting] = useState(false);
+  const navigate = useNavigate();
+  const { triggerStepSuccess } = useStepSuccess();
 
   useEffect(() => {
     fetch(`${API_URL}/api/assets`)
@@ -46,8 +50,6 @@ export const Comparison = () => {
     }
   };
 
-
-
   const handleDraftEvidence = async () => {
     if (!draftEvidence) return;
     setDrafting(true);
@@ -58,7 +60,15 @@ export const Comparison = () => {
         body: JSON.stringify(draftEvidence)
       });
       if (!response.ok) throw new Error('Failed to draft evidence');
-      alert('Drafted successfully! Go to the Evidence tab to review and verify.');
+
+      // Trigger Step Success confirmation toast with Next Step guidance
+      triggerStepSuccess({
+        title: 'Evidence Drafted',
+        message: 'Before/After comparison observations drafted into the evidence review pipeline.',
+        nextStepLabel: 'Review in Evidence Hub',
+        autoAdvanceSeconds: 5,
+        onNext: () => navigate('/evidence'),
+      });
     } catch (err) {
       alert(err.message);
     } finally {

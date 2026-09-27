@@ -8,6 +8,7 @@ import { Reports } from './pages/Reports';
 import { Projects } from './pages/Projects';
 import { ProjectDetails } from './pages/ProjectDetails';
 import { Media } from './pages/Media';
+import { StepSuccessProvider } from './context/StepSuccessContext';
 
 // Placeholder components for routing
 const Placeholder = ({ title }) => (
@@ -22,18 +23,20 @@ const Placeholder = ({ title }) => (
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="projects" element={<Projects />} />
-          <Route path="projects/:id" element={<ProjectDetails />} />
-          <Route path="media" element={<Media />} />
-          <Route path="search" element={<Search />} />
-          <Route path="evidence" element={<Evidence />} />
-          <Route path="comparison" element={<Comparison />} />
-          <Route path="reports" element={<Reports />} />
-        </Route>
-      </Routes>
+      <StepSuccessProvider>
+        <Routes>
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="projects" element={<Projects />} />
+            <Route path="projects/:id" element={<ProjectDetails />} />
+            <Route path="media" element={<Media />} />
+            <Route path="search" element={<Search />} />
+            <Route path="evidence" element={<Evidence />} />
+            <Route path="comparison" element={<Comparison />} />
+            <Route path="reports" element={<Reports />} />
+          </Route>
+        </Routes>
+      </StepSuccessProvider>
     </BrowserRouter>
   );
 }

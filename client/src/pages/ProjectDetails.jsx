@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LayoutGrid, Clock, MapPin } from 'lucide-react';
 import { MediaDetailModal } from '../components/MediaDetailModal';
+import { useStepSuccess } from '../context/StepSuccessContext';
 import {
   ProjectHeader,
   ProjectDuplicateBanner,
@@ -118,6 +119,8 @@ export const ProjectDetails = () => {
     }
   }, [assets, id]);
 
+  const { triggerStepSuccess } = useStepSuccess();
+
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -146,6 +149,15 @@ export const ProjectDetails = () => {
       }
 
       setAssets((prev) => [newAsset, ...prev]);
+
+      // Trigger persistent confirmation toast (no auto-jump timer, allowing multiple uploads)
+      triggerStepSuccess({
+        title: 'Media Uploaded',
+        message: `"${file.name}" uploaded successfully. Upload more or proceed to comparison.`,
+        nextStepLabel: 'Go to Comparison',
+        autoAdvance: false,
+        onNext: () => navigate('/comparison'),
+      });
     } catch (err) {
       alert(err.message);
     } finally {

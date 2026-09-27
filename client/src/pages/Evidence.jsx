@@ -2,12 +2,14 @@ import { API_URL } from '../config.js';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, ShieldAlert, FileText, Image as ImageIcon } from 'lucide-react';
+import { useStepSuccess } from '../context/StepSuccessContext';
 
 export const Evidence = () => {
   const [evidenceList, setEvidenceList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const { triggerStepSuccess } = useStepSuccess();
 
   useEffect(() => {
     fetch(`${API_URL}/api/evidence`)
@@ -24,6 +26,15 @@ export const Evidence = () => {
       setEvidenceList(prev => prev.map(ev => 
         ev._id === id ? { ...ev, verified: true } : ev
       ));
+
+      // Trigger Step Success confirmation toast with Next Step guidance
+      triggerStepSuccess({
+        title: 'Evidence Verified',
+        message: 'Evidence claim has been verified and marked as trusted for impact storytelling.',
+        nextStepLabel: 'Generate Impact Report',
+        autoAdvanceSeconds: 5,
+        onNext: () => navigate('/reports'),
+      });
     } catch (err) {
       alert(err.message);
     }

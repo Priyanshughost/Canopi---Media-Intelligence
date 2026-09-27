@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { VisualReportRenderer } from '../components/report/VisualReportRenderer';
 import { CampaignPostsView } from '../components/report/CampaignPostsView';
+import { useStepSuccess } from '../context/StepSuccessContext';
 
 export const Reports = () => {
   const [reports, setReports] = useState([]);
@@ -26,6 +27,7 @@ export const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewModes, setViewModes] = useState({}); // { [reportId]: 'visual' | 'markdown' }
+  const { triggerStepSuccess } = useStepSuccess();
 
   useEffect(() => {
     const loadData = async () => {
@@ -88,7 +90,17 @@ export const Reports = () => {
 
       setReports((prev) => [newReport, ...prev]);
       setViewModes((prev) => ({ ...prev, [newReport._id]: 'visual' }));
-      alert('Visual Impact Report successfully generated!');
+
+      // Trigger Step Success confirmation toast
+      triggerStepSuccess({
+        title: 'Visual Report Generated',
+        message: 'Impact report created with verified visuals, derivatives, and structured blocks.',
+        nextStepLabel: 'Generate Campaign Cards',
+        autoAdvanceSeconds: 5,
+        onNext: () => {
+          handleGenerateCampaign(newReport);
+        },
+      });
     } catch (err) {
       alert(err.message);
     } finally {
@@ -136,6 +148,18 @@ export const Reports = () => {
           prev.map((r) => (r._id === report._id ? data.report : r))
         );
       }
+
+      // Trigger Step Success confirmation toast
+      triggerStepSuccess({
+        title: 'Campaign Content Ready',
+        message: 'Social campaign cards paired with ready-to-post visuals and copy.',
+        nextStepLabel: 'View Social Cards',
+        autoAdvanceSeconds: 5,
+        onNext: () => {
+          const section = document.getElementById(`report-${report._id}`);
+          if (section) section.scrollIntoView({ behavior: 'smooth' });
+        },
+      });
     } catch (err) {
       alert(err.message);
     } finally {
