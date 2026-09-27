@@ -10,6 +10,8 @@ const startServer = async () => {
     if (config.db.uri) {
       await connectDB(); 
       console.log('[STARTUP] MongoDB connection initialized');
+      const { seedDemoAccount } = await import('./scripts/seedDemoAccount.js');
+      await seedDemoAccount();
     }
   } catch (error) {
     console.error('[STARTUP ERROR] Failed to connect to database during startup:', error);

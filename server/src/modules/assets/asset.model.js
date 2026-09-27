@@ -21,16 +21,46 @@ const mediaAssetSchema = new mongoose.Schema(
     },
     originalFilename: { type: String },
     mediaType: { type: String, enum: ['image', 'video'], required: true },
+    duration: { type: Number }, // Video duration in seconds
+    thumbnailUrl: { type: String }, // Extracted frame poster
+    streamingUrl: { type: String }, // HLS/DASH or web-optimized MP4 stream
+    videoTranscript: [
+      {
+        startTime: { type: Number, required: true },
+        endTime: { type: Number, required: true },
+        description: { type: String, required: true },
+        confidence: { type: Number, default: 0.9 },
+        frameUrl: { type: String },
+      },
+    ],
+    videoMetadata: {
+      fps: { type: Number },
+      bitRate: { type: Number },
+      codec: { type: String },
+      resolution: { type: String },
+    },
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
     capturedAt: { type: Date },
     location: {
+      lat: { type: Number },
+      lng: { type: Number },
       latitude: { type: Number },
       longitude: { type: Number },
+      source: {
+        type: String,
+        enum: ['exif', 'manual', 'inferred'],
+        default: 'manual',
+      },
       name: { type: String },
     },
+    phash: { type: String, index: true },
+    qualityAnalysis: { type: mongoose.Schema.Types.Mixed },
+    colors: { type: mongoose.Schema.Types.Mixed },
+    enhancedVersion: { type: String },
+    verified: { type: Boolean, default: false },
     metadata: { type: mongoose.Schema.Types.Mixed }, // Arbitrary EXIF/metadata
     aiAnalysis: {
       description: { type: String },
@@ -45,6 +75,27 @@ const mediaAssetSchema = new mongoose.Schema(
       model: { provider: String, model: String, version: String },
       analyzedAt: { type: Date },
     },
+    cloudinaryVisionAnalysis: {
+      questions: [
+        {
+          question: { type: String },
+          answer: { type: String },
+        },
+      ],
+      answers: { type: mongoose.Schema.Types.Mixed },
+      rawResponse: { type: mongoose.Schema.Types.Mixed },
+      analyzedAt: { type: Date },
+    },
+    moderation: { type: mongoose.Schema.Types.Mixed },
+    flaggedForReview: { type: Boolean, default: false },
+    trustScore: { type: Number, default: 70, min: 0, max: 100 },
+    trustScoreBreakdown: [
+      {
+        factor: { type: String },
+        impact: { type: Number },
+        detail: { type: String },
+      },
+    ],
     processingStatus: {
       type: String,
       enum: ['UPLOADING', 'UPLOADED', 'ANALYZING', 'EMBEDDING', 'INDEXING', 'READY', 'FAILED'],
@@ -54,12 +105,34 @@ const mediaAssetSchema = new mongoose.Schema(
       type: { type: String }, // e.g., 'frame_extraction', 'original'
       originalAssetId: { type: mongoose.Schema.Types.ObjectId, ref: 'MediaAsset' },
     },
+    derivatives: [
+      {
+        public_id: { type: String },
+        publicId: { type: String },
+        url: { type: String, required: true },
+        transformation: { type: String, required: true },
+        purpose: {
+          type: String,
+          enum: ['thumbnail', 'report_crop', 'enhanced', 'campaign_post', 'custom'],
+          required: true,
+        },
+        linkedToOriginal: {
+          type: String, // original asset public_id or asset_id
+          required: true,
+        },
+        width: { type: Number },
+        height: { type: Number },
+        bytes: { type: Number },
+        format: { type: String },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     transformations: [
       {
         type: String,
         url: String,
         createdAt: Date,
-      }
+      },
     ],
   },
   {
@@ -67,4 +140,33 @@ const mediaAssetSchema = new mongoose.Schema(
   }
 );
 
+export const AssetDerivative = mongoose.model(
+  'AssetDerivative',
+  new mongoose.Schema(
+    {
+      assetId: { type: mongoose.Schema.Types.ObjectId, ref: 'MediaAsset' },
+      public_id: { type: String },
+      publicId: { type: String },
+      url: { type: String, required: true },
+      transformation: { type: String, required: true },
+      purpose: {
+        type: String,
+        enum: ['thumbnail', 'report_crop', 'enhanced', 'campaign_post', 'custom'],
+        required: true,
+      },
+      linkedToOriginal: {
+        type: String,
+        required: true,
+      },
+      width: { type: Number },
+      height: { type: Number },
+      bytes: { type: Number },
+      format: { type: String },
+      createdAt: { type: Date, default: Date.now },
+    },
+    { timestamps: true }
+  )
+);
+
 export const MediaAsset = mongoose.model('MediaAsset', mediaAssetSchema);
+

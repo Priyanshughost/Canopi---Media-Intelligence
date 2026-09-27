@@ -15,6 +15,11 @@ const projectSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    organizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     status: {
       type: String,
       enum: ['PLANNED', 'ACTIVE', 'COMPLETED', 'ON_HOLD'],
@@ -35,7 +40,6 @@ const projectSchema = new mongoose.Schema(
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      // required: true, // Optional for MVP if auth isn't fully implemented
     },
   },
   {

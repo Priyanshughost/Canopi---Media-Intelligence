@@ -6,8 +6,12 @@ import searchRoutes from './modules/search/search.routes.js';
 import evidenceRoutes from './modules/evidence/evidence.routes.js';
 import comparisonRoutes from './modules/comparisons/comparison.routes.js';
 import reportRoutes from './modules/reports/report.routes.js';
+import webhookRoutes from './modules/webhooks/webhook.routes.js';
+import authRoutes from './modules/auth/auth.routes.js';
 
 const app = express();
+
+app.set('etag', false);
 
 app.use(cors({
   origin: true, // Dynamically allow any origin (e.g. testing from a phone or 127.0.0.1)
@@ -15,6 +19,14 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Prevent browser 304 stale caching on dynamic API routes
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 // Arranged Console Logging for End-to-End Debugging
 app.use((req, res, next) => {
@@ -49,12 +61,14 @@ app.get('/api/health', (req, res) => {
 });
 
 // API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/evidence', evidenceRoutes);
 app.use('/api/comparisons', comparisonRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Basic error handler
 app.use((err, req, res, next) => {

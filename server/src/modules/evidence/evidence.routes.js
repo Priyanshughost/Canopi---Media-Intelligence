@@ -5,8 +5,11 @@ import {
   verifyEvidence,
   deleteEvidence
 } from './evidence.controller.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 
 const router = Router();
+
+router.use(authenticate);
 
 router.post('/', createEvidence);
 router.get('/', getEvidence);

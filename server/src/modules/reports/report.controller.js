@@ -2,13 +2,76 @@ import { Report } from './report.model.js';
 import { Project } from '../projects/project.model.js';
 import { Evidence } from '../evidence/evidence.model.js';
 import { generateProjectReport, generateCampaignContent } from '../../ai/groq.js';
+import { generateVisualStory } from '../../services/visualStoryGenerator.js';
+import { generateHighlightReel } from '../../services/cloudinaryIntelligence/videoAnalysis.js';
+import { generatePlatformReel } from '../../services/socialReelGenerator.js';
 import { config } from '../../config/env.js';
+
+/**
+ * Selects the optimal visual derivative for an asset
+ * Prefers Cloudinary report_crop (16:9) or enhanced versions over raw original
+ */
+export const selectBestVisualForAsset = (asset) => {
+  if (!asset) return null;
+
+  // 1. Check derivatives: prefer report_crop (16:9) or enhanced
+  if (Array.isArray(asset.derivatives) && asset.derivatives.length > 0) {
+    const reportCrop = asset.derivatives.find((d) => d.purpose === 'report_crop');
+    if (reportCrop && reportCrop.url) {
+      return {
+        url: reportCrop.url,
+        transformation: reportCrop.transformation || 'c_fill,ar_16:9,g_auto,w_1200',
+        purpose: 'report_crop',
+        sourceAssetId: asset._id,
+        originalFilename: asset.originalFilename,
+        location: asset.location,
+      };
+    }
+
+    const enhanced = asset.derivatives.find((d) => d.purpose === 'enhanced');
+    if (enhanced && enhanced.url) {
+      return {
+        url: enhanced.url,
+        transformation: enhanced.transformation || 'e_gen_restore',
+        purpose: 'enhanced',
+        sourceAssetId: asset._id,
+        originalFilename: asset.originalFilename,
+        location: asset.location,
+      };
+    }
+  }
+
+  // 2. Check enhancedVersion directly
+  if (asset.enhancedVersion) {
+    return {
+      url: asset.enhancedVersion,
+      transformation: 'e_gen_restore',
+      purpose: 'enhanced',
+      sourceAssetId: asset._id,
+      originalFilename: asset.originalFilename,
+      location: asset.location,
+    };
+  }
+
+  // 3. Fallback to original Cloudinary secureUrl
+  return {
+    url: asset.cloudinary?.secureUrl || null,
+    transformation: 'original',
+    purpose: 'original',
+    sourceAssetId: asset._id,
+    originalFilename: asset.originalFilename,
+    location: asset.location,
+  };
+};
 
 export const generateReport = async (req, res, next) => {
   try {
     const { projectId, evidenceIds } = req.body;
 
-    console.log('[Report Controller] Generation requested', { projectId, evidenceCount: evidenceIds?.length });
+    console.log('[Report Controller] Generation requested', {
+      projectId,
+      evidenceCount: evidenceIds?.length,
+    });
 
     if (!projectId || !evidenceIds || !evidenceIds.length) {
       return res.status(400).json({ error: 'projectId and evidenceIds are required' });
@@ -17,11 +80,11 @@ export const generateReport = async (req, res, next) => {
     const project = await Project.findById(projectId);
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
-    // Only fetch verified evidence
+    // Only fetch verified evidence with populated source assets
     const evidenceData = await Evidence.find({
       _id: { $in: evidenceIds },
-      verified: true
-    });
+      verified: true,
+    }).populate('sourceAssets');
 
     if (evidenceData.length === 0) {
       return res.status(400).json({ error: 'No verified evidence provided for the report' });
@@ -30,6 +93,88 @@ export const generateReport = async (req, res, next) => {
     console.log(`[Report Controller] Generating report for project ${projectId} using Groq`);
     const reportContent = await generateProjectReport(project, evidenceData);
 
+    // 1. Gather all best visuals from evidence items
+    const availableVisuals = [];
+    evidenceData.forEach((ev) => {
+      if (Array.isArray(ev.sourceAssets)) {
+        ev.sourceAssets.forEach((asset) => {
+          const visual = selectBestVisualForAsset(asset);
+          if (visual && visual.url) {
+            availableVisuals.push({
+              ...visual,
+              evidenceTitle: ev.title,
+              evidenceType: ev.type,
+            });
+          }
+        });
+      }
+    });
+
+    // 2. Construct Structured Visual Report Blocks
+    const reportBlocks = [];
+
+    // Block: Title & Executive Summary
+    reportBlocks.push({
+      type: 'heading',
+      headingLevel: 1,
+      content: reportContent.title,
+    });
+
+    reportBlocks.push({
+      type: 'callout',
+      content: reportContent.executiveSummary,
+      caption: 'Executive Impact Summary',
+    });
+
+    // Block: Key Findings with Embedded Evidence Images
+    if (Array.isArray(reportContent.keyFindings)) {
+      reportContent.keyFindings.forEach((finding, idx) => {
+        reportBlocks.push({
+          type: 'heading',
+          headingLevel: 2,
+          content: `Key Finding ${idx + 1}: ${finding.split('.')[0]}`,
+        });
+
+        // Attach best available visual asset for this finding if available
+        const visual = availableVisuals[idx % (availableVisuals.length || 1)];
+        if (visual && visual.url) {
+          const locStr = visual.location?.name || (visual.location?.lat ? `${visual.location.lat.toFixed(3)}, ${visual.location.lng?.toFixed(3)}` : null);
+          const captionParts = [
+            `Verified Evidence: ${visual.originalFilename || visual.evidenceTitle}`,
+            visual.purpose === 'report_crop' ? 'Cloudinary 16:9 Report Crop' : visual.purpose === 'enhanced' ? 'AI Generative Restored' : null,
+            locStr ? `Location: ${locStr}` : null,
+          ].filter(Boolean);
+
+          reportBlocks.push({
+            type: 'image',
+            url: visual.url,
+            caption: captionParts.join(' • '),
+            sourceAssetId: visual.sourceAssetId,
+            transformation: visual.transformation,
+            purpose: visual.purpose,
+          });
+        }
+
+        reportBlocks.push({
+          type: 'text',
+          content: finding,
+        });
+      });
+    }
+
+    // Block: Limitations & Methodology
+    if (reportContent.limitations) {
+      reportBlocks.push({
+        type: 'heading',
+        headingLevel: 3,
+        content: 'Observation & Methodology Limitations',
+      });
+      reportBlocks.push({
+        type: 'text',
+        content: reportContent.limitations,
+      });
+    }
+
     const report = await Report.create({
       projectId,
       title: reportContent.title,
@@ -37,10 +182,11 @@ export const generateReport = async (req, res, next) => {
       keyFindings: reportContent.keyFindings,
       limitations: reportContent.limitations,
       evidenceUsed: evidenceIds,
+      reportBlocks,
       generatedBy: {
         provider: 'Groq',
-        model: config.ai.groqModel || 'llama3-8b-8192'
-      }
+        model: config.ai.groqModel || 'llama3-8b-8192',
+      },
     });
 
     res.status(201).json(report);
@@ -52,15 +198,29 @@ export const generateReport = async (req, res, next) => {
 export const getReports = async (req, res, next) => {
   try {
     const { projectId } = req.query;
-    const filter = projectId ? { projectId } : {};
-    
+    const filter = {};
+
+    if (projectId) {
+      if (req.user?.organizationId) {
+        const project = await Project.findOne({ _id: projectId, organizationId: req.user.organizationId });
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found or access denied.' });
+        }
+      }
+      filter.projectId = projectId;
+    } else if (req.user?.organizationId) {
+      const orgProjects = await Project.find({ organizationId: req.user.organizationId }).select('_id');
+      const orgProjectIds = orgProjects.map((p) => p._id);
+      filter.projectId = { $in: orgProjectIds };
+    }
+
     console.log('[Report Controller] Fetching reports', { filter });
 
     const reports = await Report.find(filter)
       .populate('projectId', 'name')
       .populate('evidenceUsed', 'title')
       .sort({ createdAt: -1 });
-      
+
     res.json(reports);
   } catch (error) {
     next(error);
@@ -70,8 +230,12 @@ export const getReports = async (req, res, next) => {
 export const generateCampaign = async (req, res, next) => {
   try {
     const { projectId, evidenceId, reportId } = req.body;
-    
-    console.log('[Report Controller] Campaign generation requested', { projectId, evidenceId, reportId });
+
+    console.log('[Report Controller] Campaign generation requested', {
+      projectId,
+      evidenceId,
+      reportId,
+    });
 
     if (!reportId) {
       return res.status(400).json({ error: 'reportId is required' });
@@ -83,24 +247,202 @@ export const generateCampaign = async (req, res, next) => {
     }
 
     const project = await Project.findById(projectId);
-    const evidence = await Evidence.findById(evidenceId);
-    
+    const evidence = await Evidence.findById(evidenceId).populate('sourceAssets');
+
     if (!project || !evidence) {
       return res.status(404).json({ error: 'Project or Evidence not found' });
     }
-    
+
     if (!evidence.verified) {
-      return res.status(400).json({ error: 'Cannot generate campaign content from unverified evidence' });
+      return res.status(400).json({
+        error: 'Cannot generate campaign content from unverified evidence',
+      });
     }
-    
+
     const content = await generateCampaignContent(project, evidence);
-    
-    // Persist the campaign content to the report
+
+    // Pick best visual from evidence
+    let bestVisual = null;
+    if (Array.isArray(evidence.sourceAssets) && evidence.sourceAssets.length > 0) {
+      bestVisual = selectBestVisualForAsset(evidence.sourceAssets[0]);
+    }
+
+    // Build platform-ready campaign post items
+    const campaignPosts = [
+      {
+        platform: 'LinkedIn',
+        headline: `${project.name} Verified Impact Update`,
+        caption: content,
+        suggestedImageUrl: bestVisual?.url || null,
+        sourceAssetId: bestVisual?.sourceAssetId || null,
+        transformation: bestVisual?.transformation || null,
+        hashtags: ['ImpactVerification', 'Sustainability', 'CanopiPlatform'],
+      },
+      {
+        platform: 'Twitter / X',
+        headline: `Field Observation Verified`,
+        caption:
+          content.length > 240
+            ? content.slice(0, 240) + '... #Impact #ESG'
+            : `${content} #Impact #ESG`,
+        suggestedImageUrl: bestVisual?.url || null,
+        sourceAssetId: bestVisual?.sourceAssetId || null,
+        transformation: bestVisual?.transformation || null,
+        hashtags: ['ClimateAction', 'Transparency', 'VerifiedProof'],
+      },
+    ];
+
+    // Persist the campaign content & visual posts to the report
     report.campaignContent = content;
+    report.campaignPosts = campaignPosts;
     await report.save();
-    
-    res.json({ content });
+
+    res.json({
+      content,
+      campaignPosts,
+      report,
+    });
   } catch (error) {
     next(error);
   }
 };
+
+export const generateVisualStoryForReport = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { format } = req.body;
+
+    console.log('[Report Controller] Visual Story generation requested', { reportId: id, format });
+
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const visualStory = await generateVisualStory(report.projectId, id, { format });
+    res.json(visualStory);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
+export const getVisualStoryForReport = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    if (!report.visualStory || !report.visualStory.slides || report.visualStory.slides.length === 0) {
+      return res.status(404).json({ error: 'Visual story not yet generated for this report' });
+    }
+
+    res.json(report.visualStory);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const generateReportHighlightReel = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const reel = await generateHighlightReel(report.projectId);
+    res.json(reel);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
+export const getReportHighlightReel = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const reel = await generateHighlightReel(report.projectId);
+    res.json(reel);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
+export const generateSocialReelForReport = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const platform = (req.query.platform || req.body?.platform || 'reels').toLowerCase();
+    
+    if (!['reels', 'twitter'].includes(platform)) {
+      return res.status(400).json({ error: 'Invalid platform. Must be "reels" or "twitter"' });
+    }
+
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const reel = await generatePlatformReel(report.projectId, platform);
+
+    // Save to report document
+    if (!report.socialReels) {
+      report.socialReels = {};
+    }
+    report.socialReels[platform] = reel;
+    await report.save();
+
+    res.json(reel);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
+export const getSocialReelForReport = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const platform = (req.query.platform || 'reels').toLowerCase();
+
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const savedReel = report.socialReels?.[platform];
+    if (savedReel && savedReel.videoUrl) {
+      return res.json(savedReel);
+    }
+
+    // Auto-generate if not yet present
+    const reel = await generatePlatformReel(report.projectId, platform);
+    if (!report.socialReels) report.socialReels = {};
+    report.socialReels[platform] = reel;
+    await report.save();
+
+    res.json(reel);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
+

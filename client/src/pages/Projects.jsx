@@ -1,14 +1,17 @@
 import { API_URL } from '../config.js';
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Activity, Plus, Trash2 } from 'lucide-react';
 import { CreateProjectModal } from '../components/CreateProjectModal';
+import { useStepSuccess } from '../context/StepSuccessContext';
 
 export const Projects = () => {
   const [projects, setProjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  const { triggerStepSuccess } = useStepSuccess();
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -27,7 +30,16 @@ export const Projects = () => {
   }, []);
 
   const handleNewProjectSuccess = (newProj) => {
-    setProjects([newProj, ...projects]);
+    setProjects((prev) => [newProj, ...prev]);
+
+    // Trigger Step Success confirmation toast
+    triggerStepSuccess({
+      title: 'Project Created',
+      message: `"${newProj.name}" created. Next: Upload visual media assets.`,
+      nextStepLabel: 'Upload Media',
+      autoAdvanceSeconds: 5,
+      onNext: () => navigate(`/projects/${newProj._id}`),
+    });
   };
 
   const handleProjectDelete = async (e, projectId) => {
