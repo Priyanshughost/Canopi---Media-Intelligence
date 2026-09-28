@@ -7,10 +7,25 @@ import App from './App.jsx';
 const originalFetch = window.fetch;
 window.fetch = async (input, init = {}) => {
   const token = localStorage.getItem('canopi_token');
-  const headers = new Headers(init.headers || {});
-
-  if (token && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${token}`);
+  
+  let headers;
+  if (init.headers instanceof Headers) {
+    headers = new Headers(init.headers);
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+  } else if (Array.isArray(init.headers)) {
+    headers = new Headers(init.headers);
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+  } else {
+    headers = {
+      ...(init.headers || {}),
+    };
+    if (token && !headers['Authorization'] && !headers['authorization']) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
   }
 
   const newInit = {
@@ -25,7 +40,11 @@ window.fetch = async (input, init = {}) => {
     const isAuthRoute =
       window.location.pathname.startsWith('/login') ||
       window.location.pathname.startsWith('/signup') ||
-      (typeof input === 'string' && (input.includes('/api/auth/login') || input.includes('/api/auth/signup') || input.includes('/api/auth/demo-credentials')));
+      (typeof input === 'string' &&
+        (input.includes('/api/auth/login') ||
+          input.includes('/api/auth/signup') ||
+          input.includes('/api/auth/demo-credentials') ||
+          input.includes('/api/auth/me')));
 
     if (!isAuthRoute) {
       localStorage.removeItem('canopi_token');
