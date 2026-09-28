@@ -14,9 +14,12 @@ const app = express();
 app.set('etag', false);
 
 app.use(cors({
-  origin: true, // Dynamically allow any origin (e.g. testing from a phone or 127.0.0.1)
-  credentials: true
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
 }));
+app.options('*', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
