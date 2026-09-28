@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import projectRoutes from './modules/projects/project.routes.js';
 import assetRoutes from './modules/assets/asset.routes.js';
 import searchRoutes from './modules/search/search.routes.js';
@@ -81,5 +83,17 @@ app.use((err, req, res, next) => {
   console.log(`╰───────────────────────────────────────────────────\n`);
   res.status(500).json({ error: 'Something went wrong!', details: err.message });
 });
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve static frontend files in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../../client/dist')));
+
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, '../../client/dist', 'index.html'));
+  });
+}
 
 export default app;
